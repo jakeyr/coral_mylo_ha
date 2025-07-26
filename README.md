@@ -88,3 +88,19 @@ This is an **unofficial** integration, not endorsed by Coral Smart Pool.  Use 
 
 PRs and issues welcome!
 
+## Development
+
+To run the unit tests:
+
+1. Install the test requirements:
+
+   ```bash
+   pip install -r requirements-test.txt
+   ```
+
+2. Execute the test suite from the repo root:
+
+   ```bash
+   pytest -q
+   ```
+
