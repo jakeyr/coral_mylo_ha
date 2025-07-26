@@ -1,0 +1,8 @@
+{
+  "name": "Coral Mylo Integration",
+  "content_in_root": false,
+  "domains": ["coral_mylo"],
+  "country": "US",
+  "homeassistant": "2023.7.0",
+  "render_readme": true
+}

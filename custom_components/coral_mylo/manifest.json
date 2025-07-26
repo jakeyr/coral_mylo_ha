@@ -1,7 +1,7 @@
 {
     "domain": "coral_mylo",
     "name": "Coral Mylo Integration",
-    "documentation": "https://github.com/jakeyr/coral_mylo",
+    "documentation": "https://github.com/jakeyr/coral_mylo_ha",
     "dependencies": [],
     "codeowners": ["@jakeyr"],
     "version": "1.0.0",
