@@ -1,10 +1,10 @@
 {
     "domain": "coral_mylo",
     "name": "Coral Mylo Integration",
-    "config_flow": true,
     "documentation": "https://github.com/jakeyr/coral_mylo",
     "dependencies": [],
     "codeowners": ["@jakeyr"],
-    "requirements": ["aiohttp"],
-    "version": "0.1.0"
+    "version": "1.0.0",
+    "config_flow": true,
+    "requirements": ["aiohttp"]
 }

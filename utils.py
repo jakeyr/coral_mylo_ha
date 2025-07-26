@@ -3,20 +3,17 @@ import socket
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
-
 STATS_PORT = 8126
 
 def discover_device_id_from_statsd(ip):
-    try:
-        gauges = _read_gauges_from_statsd(ip)
-        for key in gauges.keys():
-            if key.startswith("coral."):
-                return key.split(".")[1]
-    except Exception as e:
-        _LOGGER.error(f"Device discovery failed: {e}")
+    """Finds the device ID by querying the TCP statsd interface."""
+    gauges = read_gauges_from_statsd(ip)
+    for key in gauges.keys():
+        if key.startswith("coral."):
+            return key.split(".")[1]
     return None
 
-def _read_gauges_from_statsd(ip):
+def read_gauges_from_statsd(ip):
     try:
         with socket.create_connection((ip, STATS_PORT), timeout=2) as sock:
             sock.sendall(b"gauges\n")
@@ -35,7 +32,7 @@ def _read_gauges_from_statsd(ip):
         return {}
 
 def get_statsd_gauge_value(ip, key):
-    gauges = _read_gauges_from_statsd(ip)
+    gauges = read_gauges_from_statsd(ip)
     return gauges.get(key)
 
 async def refresh_jwt(refresh_token, api_key):
@@ -44,17 +41,26 @@ async def refresh_jwt(refresh_token, api_key):
         "grant_type": "refresh_token",
         "refresh_token": refresh_token
     }
-
     try:
-        _LOGGER.debug("Refreshing JWT via aiohttp")
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=payload) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                else:
-                    text = await resp.text()
-                    _LOGGER.error(f"Failed to refresh JWT: {resp.status} {text}")
+                data = await resp.json()
+                return data.get("access_token")
     except Exception as e:
         _LOGGER.error(f"Exception while refreshing JWT: {e}")
     return None
 
+async def fetch_firebase_download_token(bucket, path, jwt):
+    url = f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}"
+    headers = {
+        "Authorization": f"Firebase {jwt}",
+        "Accept": "application/json"
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as resp:
+                data = await resp.json()
+                return data.get("downloadTokens")
+    except Exception as e:
+        _LOGGER.error(f"Error fetching download token: {e}")
+    return None
