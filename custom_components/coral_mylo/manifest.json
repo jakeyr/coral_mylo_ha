@@ -7,5 +7,6 @@
     "version": "1.0.1",
     "config_flow": true,
     "issue_tracker": "https://github.com/jakeyr/coral_mylo_ha/issues",
-    "requirements": ["aiohttp"]
+    "requirements": ["aiohttp"],
+    "iot_class": "cloud_polling"
 }
