@@ -7,7 +7,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
-    device_id = discover_device_id_from_statsd(ip)
+    device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
     if not device_id:
         _LOGGER.error("Could not discover device ID for sensors")
         return
@@ -38,7 +38,8 @@ class MyloSensor(Entity):
 
     async def async_update(self):
         full_key = f"coral.{self._device_id}.{self._metric}"
-        value = read_gauges_from_statsd(self._ip).get(full_key)
+        gauges = await self.hass.async_add_executor_job(read_gauges_from_statsd, self._ip)
+        value = gauges.get(full_key)
         if value is not None:
             self._state = value
         else:
