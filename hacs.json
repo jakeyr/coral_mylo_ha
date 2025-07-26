@@ -4,5 +4,6 @@
   "domains": ["coral_mylo"],
   "country": "US",
   "homeassistant": "2023.7.0",
-  "render_readme": true
+  "render_readme": true,
+  "category": "integration"
 }
