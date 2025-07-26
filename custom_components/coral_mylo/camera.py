@@ -11,7 +11,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     refresh_token = entry.data[CONF_REFRESH_TOKEN]
     api_key = entry.data[CONF_API_KEY]
 
-    device_id = discover_device_id_from_statsd(ip)
+    device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
     if not device_id:
         _LOGGER.error("Could not discover device ID from StatsD")
         return

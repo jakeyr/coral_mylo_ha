@@ -9,10 +9,18 @@ Bring your **Coral MYLO Pool Camera** (SmartPool MYLO) into Home Assistant w
 ## Requirements
 - Home Assistant (core or OS)
 - Coral MYLO device on the same LAN
-- A computer that can run *mitmproxy*
+- A computer that can run *mitmproxy* (required because the MYLO app uses
+  Apple ID login and does not expose the tokens needed by Home Assistant)
 
 ## Installation
-1. Copy the `coral_mylo` folder into `<config>/custom_components/`.
+
+### Via HACS
+- Open [HACS](https://hacs.xyz/) in Home Assistant.
+- Choose **Integrations** → **+ Explore & Download Repositories**.
+- Search for **Coral Mylo Integration** and install.
+
+### Manual
+1. Copy the `custom_components/coral_mylo` folder from this repository into `<config>/custom_components/`.
 2. Restart Home Assistant.
 
 ## Setup
@@ -25,7 +33,10 @@ nmap -sn 192.168.1.0/24
 ```
 
 ### 2. Capture **API Key** and **Refresh Token** with *mitmproxy*
-Why?  Home Assistant needs these two values to fetch a short‑lived JWT that unlocks the image.
+The MYLO mobile app requires you to sign in with an Apple ID and keeps its
+authentication details hidden. Home Assistant needs the API key and refresh
+token in order to fetch a short‑lived JWT that unlocks the snapshot image.
+We use mitmproxy to intercept these values.
 
 1. **Install mitmproxy**  
    ```
