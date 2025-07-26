@@ -12,7 +12,7 @@ Bring your **Coral MYLO Pool Camera** (SmartPool MYLO) into Home Assistant w
 - A computer that can run *mitmproxy*
 
 ## Installation
-1. Copy the `coral_mylo` folder into `<config>/custom_components/`.
+1. Copy the `custom_components/coral_mylo` folder into `<config>/custom_components/`.
 2. Restart Home Assistant.
 
 ## Setup
