@@ -1,3 +1,5 @@
+"""Utility helpers for communicating with the MYLO device."""
+
 import logging
 import socket
 import asyncio
@@ -9,17 +11,23 @@ _LOGGER = logging.getLogger(__name__)
 STATS_PORT = 8126
 
 def discover_device_id_from_statsd(ip):
-    """Finds the device ID by querying the TCP statsd interface."""
+    """Find the device ID by querying the TCP statsd interface."""
+
+    _LOGGER.debug("Querying statsd on %s for device id", ip)
     gauges = read_gauges_from_statsd(ip)
     for key in gauges.keys():
         if key.startswith("coral."):
             return key.split(".")[1]
+    # Return None if no matching key is found
     return None
 
 def read_gauges_from_statsd(ip):
+    """Return all gauges reported by the device's StatsD server."""
+
     try:
         with socket.create_connection((ip, STATS_PORT), timeout=2) as sock:
             sock.sendall(b"gauges\n")
+            _LOGGER.debug("Sent gauges command to %s:%s", ip, STATS_PORT)
             response = b""
             while True:
                 chunk = sock.recv(4096)
@@ -29,41 +37,56 @@ def read_gauges_from_statsd(ip):
                 if b"END" in chunk:
                     break
             text = response.decode("utf-8").strip().split("\nEND")[0]
-            return eval(text.strip())
+            gauges = eval(text.strip())
+            return gauges
     except Exception as e:
         _LOGGER.error(f"Error retrieving gauges: {e}")
         return {}
 
 def get_statsd_gauge_value(ip, key):
+    """Fetch a single gauge value from StatsD."""
+
     gauges = read_gauges_from_statsd(ip)
-    return gauges.get(key)
+    value = gauges.get(key)
+    _LOGGER.debug("Gauge %s=%s", key, value)
+    return value
 
 async def refresh_jwt(refresh_token, api_key):
+    """Exchange a refresh token for a short-lived JWT."""
+
     url = f"https://securetoken.googleapis.com/v1/token?key={api_key}"
     payload = {
         "grant_type": "refresh_token",
-        "refresh_token": refresh_token
+        "refresh_token": refresh_token,
     }
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=payload) as resp:
                 data = await resp.json()
-                return data.get("access_token")
+                token = data.get("access_token")
+                _LOGGER.debug("JWT refresh returned %s", bool(token))
+                return token
     except Exception as e:
         _LOGGER.error(f"Exception while refreshing JWT: {e}")
     return None
 
 async def fetch_firebase_download_token(bucket, path, jwt):
+    """Fetch a one-time Firebase download token."""
+
     url = f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}"
     headers = {
         "Authorization": f"Firebase {jwt}",
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers) as resp:
                 data = await resp.json()
-                return data.get("downloadTokens")
+                token = data.get("downloadTokens")
+                _LOGGER.debug(
+                    "Download token request status %s", getattr(resp, "status", "unknown")
+                )
+                return token
     except Exception as e:
         _LOGGER.error(f"Error fetching download token: {e}")
     return None
@@ -74,6 +97,8 @@ async def download_latest_snapshot(device_id, refresh_token, api_key):
     bucket = "coralesto.appspot.com"
     image_path = f"images%2Fcoral_{device_id}_last.jpg"
 
+    _LOGGER.debug("Downloading snapshot for %s", device_id)
+
     jwt = await refresh_jwt(refresh_token, api_key)
     if not jwt:
         _LOGGER.error("Failed to refresh JWT")
@@ -83,17 +108,21 @@ async def download_latest_snapshot(device_id, refresh_token, api_key):
     if not token:
         _LOGGER.error("Failed to fetch download token")
         return None
+    _LOGGER.debug("Download token acquired")
 
     image_url = (
         f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o/"
         f"{image_path}?alt=media&token={token}"
     )
+    _LOGGER.debug("Fetching image from %s", image_url)
 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
                 if resp.status == 200:
-                    return await resp.read()
+                    data = await resp.read()
+                    _LOGGER.debug("Image fetched successfully")
+                    return data
                 text = await resp.text()
                 _LOGGER.error(
                     "Failed to fetch image: %s, Response: %s",
@@ -128,6 +157,7 @@ class MyloWebsocketClient:
         self._sensor_callbacks[path] = callback
 
     async def start(self):
+        """Start the persistent WebSocket connection."""
         if self._running:
             return
         self._running = True
@@ -135,6 +165,7 @@ class MyloWebsocketClient:
         self._task = self._hass.loop.create_task(self._run())
 
     async def stop(self):
+        """Stop the WebSocket connection."""
         self._running = False
         if self._task:
             self._task.cancel()
@@ -148,11 +179,15 @@ class MyloWebsocketClient:
             await self._session.close()
 
     async def _send(self, data):
+        """Helper to send data over the WebSocket."""
         if not self._ws:
             return
         await self._ws.send_json(data)
+        _LOGGER.debug("Sent WS message: %s", data)
 
     async def _run(self):
+        """Main loop handling reconnections and incoming messages."""
+
         url = "wss://coralesto.firebaseio.com/.ws?v=5&ns=coralesto"
         while self._running:
             try:
@@ -160,6 +195,7 @@ class MyloWebsocketClient:
                 if not jwt:
                     await asyncio.sleep(5)
                     continue
+                _LOGGER.debug("WebSocket authenticated")
                 self._ws = await self._session.ws_connect(url)
                 self._rid = 1
                 await self._send({"t": "d", "d": {"r": self._rid, "a": "auth", "b": {"cred": jwt}}})
@@ -177,6 +213,7 @@ class MyloWebsocketClient:
                         data = json.loads(msg.data)
                     except Exception:
                         continue
+                    _LOGGER.debug("Received WS data: %s", data)
                     path = data.get("d", {}).get("b", {}).get("p")
                     payload = data.get("d", {}).get("b", {}).get("d")
                     if path == f"pooldevices/{self._device_id}/imgready":
@@ -192,9 +229,12 @@ class MyloWebsocketClient:
             await asyncio.sleep(5)
 
     async def send_getimage(self, mobile_id="ha", timeout=30):
+        """Request a fresh image from the device via the WebSocket."""
+
         await self._connected.wait()
         self._img_event.clear()
         self._rid += 1
+        _LOGGER.debug("Requesting getimage for %s", self._device_id)
         await self._send({
             "t": "d",
             "d": {
@@ -208,6 +248,7 @@ class MyloWebsocketClient:
         })
         try:
             await asyncio.wait_for(self._img_event.wait(), timeout=timeout)
+            _LOGGER.debug("Image ready event received")
             return True
         except asyncio.TimeoutError:
             return False

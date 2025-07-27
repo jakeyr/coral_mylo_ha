@@ -1,3 +1,5 @@
+"""Camera platform for the Coral Mylo integration."""
+
 import logging
 from homeassistant.components.camera import Camera
 from .utils import (
@@ -9,6 +11,9 @@ from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the camera entity for a config entry."""
+
+    _LOGGER.debug("Setting up camera entry %s", entry.entry_id)
     ip = entry.data[CONF_IP_ADDRESS]
     refresh_token = entry.data[CONF_REFRESH_TOKEN]
     api_key = entry.data[CONF_API_KEY]
@@ -19,6 +24,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if not device_id:
             _LOGGER.error("Could not discover device ID from StatsD")
             return
+        _LOGGER.debug("Discovered device id %s for camera", device_id)
 
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
 
@@ -28,13 +34,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
     hass.data.setdefault(DOMAIN, {}).setdefault("cameras", {})[entry.entry_id] = camera
 
     if ws:
+        _LOGGER.debug("Registering websocket update handler for camera")
         async def _update(_):
             image = await download_latest_snapshot(device_id, refresh_token, api_key)
             camera.update_image(image)
         ws.register_sensor(f"/pooldevices/{device_id}/imgready", _update)
 
 class MyloCamera(Camera):
+    """Representation of the MYLO camera entity."""
+
     def __init__(self, ip, refresh_token, api_key, device_id):
+        """Initialize the camera entity."""
+
         super().__init__()
         self._ip = ip
         self._refresh_token = refresh_token
@@ -53,7 +64,9 @@ class MyloCamera(Camera):
         }
 
     async def async_camera_image(self, **kwargs):
+        """Return bytes of the latest snapshot."""
         if self._image is None:
+            _LOGGER.debug("Fetching initial image for %s", self._device_id)
             self._image = await download_latest_snapshot(
                 self._device_id, self._refresh_token, self._api_key
             )
@@ -65,3 +78,4 @@ class MyloCamera(Camera):
             self._image = image
             if self.hass:
                 self.async_write_ha_state()
+            _LOGGER.debug("Camera image for %s updated", self._device_id)
