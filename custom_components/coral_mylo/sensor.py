@@ -1,7 +1,7 @@
 import logging
 from homeassistant.helpers.entity import Entity
 from .utils import discover_device_id_from_statsd, read_gauges_from_statsd
-from .const import CONF_IP_ADDRESS
+from .const import CONF_IP_ADDRESS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +35,12 @@ class MyloSensor(Entity):
         self._attr_name = f"Mylo {name}"
         self._attr_unique_id = f"mylo_{device_id}_{metric.replace('.', '_')}"
         self._attr_should_poll = True
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device_id)},
+            "manufacturer": "Coral SmartPool",
+            "model": "MYLO",
+            "name": f"MYLO {device_id}",
+        }
 
     async def async_update(self):
         full_key = f"coral.{self._device_id}.{self._metric}"

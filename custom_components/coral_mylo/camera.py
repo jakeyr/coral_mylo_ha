@@ -4,7 +4,7 @@ from .utils import (
     discover_device_id_from_statsd,
     download_latest_snapshot,
 )
-from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY
+from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +31,13 @@ class MyloCamera(Camera):
 
         self._attr_name = f"Mylo Camera {device_id}"
         self._attr_unique_id = f"mylo_camera_{device_id}"
+
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device_id)},
+            "manufacturer": "Coral SmartPool",
+            "model": "MYLO",
+            "name": f"MYLO {device_id}",
+        }
 
     async def async_camera_image(self, **kwargs):
         return await download_latest_snapshot(

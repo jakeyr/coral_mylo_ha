@@ -1,7 +1,7 @@
 import logging
 from homeassistant.components.button import ButtonEntity
 
-from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY
+from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 from .utils import (
     download_latest_snapshot,
     discover_device_id_from_statsd,
@@ -32,6 +32,12 @@ class MyloSnapshotRefreshButton(ButtonEntity):
         self._device_id = device_id
         self._attr_name = "Refresh MYLO Snapshot"
         self._attr_unique_id = f"mylo_refresh_snapshot_{device_id}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device_id)},
+            "manufacturer": "Coral SmartPool",
+            "model": "MYLO",
+            "name": f"MYLO {device_id}",
+        }
 
     async def async_press(self) -> None:
         await self._refresh_snapshot()
