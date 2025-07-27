@@ -2,6 +2,8 @@
 
 Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides several live sensors from the device's StatsD interface.
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jakeyr&repository=coral_mylo_ha&category=integration)
+
 ## Features
 - **Camera** entity displaying the most recent MYLO image
 - **Sensors** for key pool and weather values collected by MYLO:
