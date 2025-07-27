@@ -1,3 +1,5 @@
+"""Sensor entities for MYLO."""
+
 import logging
 from homeassistant.helpers.entity import Entity
 from .utils import (
@@ -11,7 +13,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up MYLO sensors for a config entry."""
+    _LOGGER.debug("Setting up sensors for entry %s", entry.entry_id)
     ip = entry.data[CONF_IP_ADDRESS]
+    # Retrieve cached device id when available
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
         device_id = await hass.async_add_executor_job(
@@ -45,11 +50,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ent = MyloRealtimeSensor(device_id, name, path, ws)
             realtime.append(ent)
             ws.register_sensor(path, ent.update_from_ws)
+            _LOGGER.debug("Registered realtime sensor for %s", path)
 
     async_add_entities(sensors + realtime, update_before_add=True)
 
 
 class MyloSensor(Entity):
+    """Sensor that polls values from the MYLO StatsD service."""
+
     def __init__(self, ip, device_id, metric, name, unit):
         self._ip = ip
         self._device_id = device_id
@@ -68,7 +76,9 @@ class MyloSensor(Entity):
         }
 
     async def async_update(self):
+        """Fetch latest value from the MYLO StatsD server."""
         full_key = f"coral.{self._device_id}.{self._metric}"
+        _LOGGER.debug("Querying gauge %s on %s", full_key, self._ip)
         gauges = await self.hass.async_add_executor_job(
             read_gauges_from_statsd, self._ip
         )
@@ -108,6 +118,8 @@ class MyloRealtimeSensor(Entity):
         }
 
     async def update_from_ws(self, value):
+        """Update state from websocket push message."""
+        _LOGGER.debug("Realtime sensor %s received %s", self._path, value)
         self._state = value
         if self.hass:
             self.async_write_ha_state()

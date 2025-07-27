@@ -1,3 +1,5 @@
+"""MYLO camera entity implementation."""
+
 import logging
 from homeassistant.components.camera import Camera
 from .utils import (
@@ -10,6 +12,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the camera entity for a config entry."""
+    _LOGGER.debug("Setting up camera for entry %s", entry.entry_id)
     ip = entry.data[CONF_IP_ADDRESS]
     refresh_token = entry.data[CONF_REFRESH_TOKEN]
     api_key = entry.data[CONF_API_KEY]
@@ -27,12 +31,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     camera = MyloCamera(ip, refresh_token, api_key, device_id)
     async_add_entities([camera])
+    _LOGGER.debug("Camera entity created for MYLO %s", device_id)
 
     hass.data.setdefault(DOMAIN, {}).setdefault("cameras", {})[entry.entry_id] = camera
 
     if ws:
 
         async def _update(_):
+            """Callback invoked when a new image is ready."""
+            _LOGGER.debug("Image ready notification received from MYLO %s", device_id)
             image = await download_latest_snapshot(device_id, refresh_token, api_key)
             camera.update_image(image)
 
@@ -40,6 +47,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class MyloCamera(Camera):
+    """Camera entity that serves the latest snapshot from MYLO."""
+
     def __init__(self, ip, refresh_token, api_key, device_id):
         super().__init__()
         self._ip = ip
@@ -59,7 +68,9 @@ class MyloCamera(Camera):
         }
 
     async def async_camera_image(self, **kwargs):
+        """Return image from MYLO, downloading if necessary."""
         if self._image is None:
+            _LOGGER.debug("Fetching initial snapshot for MYLO %s", self._device_id)
             self._image = await download_latest_snapshot(
                 self._device_id, self._refresh_token, self._api_key
             )
@@ -68,6 +79,7 @@ class MyloCamera(Camera):
     def update_image(self, image: bytes | None) -> None:
         """Update cached image and notify Home Assistant."""
         if image:
+            _LOGGER.debug("Updating cached image for MYLO %s", self._device_id)
             self._image = image
             if self.hass:
                 self.async_write_ha_state()
