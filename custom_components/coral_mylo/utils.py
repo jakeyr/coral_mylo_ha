@@ -5,6 +5,7 @@ import aiohttp
 _LOGGER = logging.getLogger(__name__)
 STATS_PORT = 8126
 
+
 def discover_device_id_from_statsd(ip):
     """Finds the device ID by querying the TCP statsd interface."""
     gauges = read_gauges_from_statsd(ip)
@@ -12,6 +13,7 @@ def discover_device_id_from_statsd(ip):
         if key.startswith("coral."):
             return key.split(".")[1]
     return None
+
 
 def read_gauges_from_statsd(ip):
     try:
@@ -31,16 +33,15 @@ def read_gauges_from_statsd(ip):
         _LOGGER.error(f"Error retrieving gauges: {e}")
         return {}
 
+
 def get_statsd_gauge_value(ip, key):
     gauges = read_gauges_from_statsd(ip)
     return gauges.get(key)
 
+
 async def refresh_jwt(refresh_token, api_key):
     url = f"https://securetoken.googleapis.com/v1/token?key={api_key}"
-    payload = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token
-    }
+    payload = {"grant_type": "refresh_token", "refresh_token": refresh_token}
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=payload) as resp:
@@ -50,12 +51,10 @@ async def refresh_jwt(refresh_token, api_key):
         _LOGGER.error(f"Exception while refreshing JWT: {e}")
     return None
 
+
 async def fetch_firebase_download_token(bucket, path, jwt):
     url = f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}"
-    headers = {
-        "Authorization": f"Firebase {jwt}",
-        "Accept": "application/json"
-    }
+    headers = {"Authorization": f"Firebase {jwt}", "Accept": "application/json"}
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers) as resp:

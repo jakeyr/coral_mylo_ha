@@ -5,6 +5,7 @@ from .const import CONF_IP_ADDRESS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
     device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
@@ -19,10 +20,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ("weather.aq_pm2_5", "Air Quality PM2.5", "µg/m³"),
     ]
 
-    sensors = [
-        MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics
-    ]
+    sensors = [MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics]
     async_add_entities(sensors, update_before_add=True)
+
 
 class MyloSensor(Entity):
     def __init__(self, ip, device_id, metric, name, unit):
@@ -44,7 +44,9 @@ class MyloSensor(Entity):
 
     async def async_update(self):
         full_key = f"coral.{self._device_id}.{self._metric}"
-        gauges = await self.hass.async_add_executor_job(read_gauges_from_statsd, self._ip)
+        gauges = await self.hass.async_add_executor_job(
+            read_gauges_from_statsd, self._ip
+        )
         value = gauges.get(full_key)
         if value is not None:
             self._state = value

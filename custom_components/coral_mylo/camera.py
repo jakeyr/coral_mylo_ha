@@ -8,6 +8,7 @@ from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
     refresh_token = entry.data[CONF_REFRESH_TOKEN]
@@ -19,6 +20,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         return
 
     async_add_entities([MyloCamera(ip, refresh_token, api_key, device_id)])
+
 
 class MyloCamera(Camera):
     def __init__(self, ip, refresh_token, api_key, device_id):
