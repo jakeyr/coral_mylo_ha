@@ -22,4 +22,3 @@ def test_discover_device_id_from_statsd(monkeypatch):
 
     device_id = utils.discover_device_id_from_statsd("1.2.3.4")
     assert device_id == "abc123"
-

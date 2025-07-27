@@ -1,15 +1,22 @@
 import logging
 from homeassistant.helpers.entity import Entity
-from .utils import discover_device_id_from_statsd, read_gauges_from_statsd, MyloWebsocketClient
+from .utils import (
+    discover_device_id_from_statsd,
+    read_gauges_from_statsd,
+    MyloWebsocketClient,
+)
 from .const import CONF_IP_ADDRESS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
         if not device_id:
             _LOGGER.error("Could not discover device ID for sensors")
             return
@@ -23,9 +30,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ("weather.aq_pm2_5", "Air Quality PM2.5", "µg/m³"),
     ]
 
-    sensors = [
-        MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics
-    ]
+    sensors = [MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics]
     realtime = []
     if ws:
         realtime_specs = [
@@ -42,6 +47,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ws.register_sensor(path, ent.update_from_ws)
 
     async_add_entities(sensors + realtime, update_before_add=True)
+
 
 class MyloSensor(Entity):
     def __init__(self, ip, device_id, metric, name, unit):
@@ -63,7 +69,9 @@ class MyloSensor(Entity):
 
     async def async_update(self):
         full_key = f"coral.{self._device_id}.{self._metric}"
-        gauges = await self.hass.async_add_executor_job(read_gauges_from_statsd, self._ip)
+        gauges = await self.hass.async_add_executor_job(
+            read_gauges_from_statsd, self._ip
+        )
         value = gauges.get(full_key)
         if value is not None:
             self._state = value
