@@ -6,7 +6,15 @@ from .utils import (
     discover_device_id_from_statsd,
     download_latest_snapshot,
 )
-from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
+from datetime import timedelta
+from homeassistant.helpers.event import async_track_time_interval
+from .const import (
+    CONF_IP_ADDRESS,
+    CONF_REFRESH_TOKEN,
+    CONF_API_KEY,
+    DOMAIN,
+    DEFAULT_REFRESH_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,7 +37,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
 
-    camera = MyloCamera(ip, refresh_token, api_key, device_id)
+    camera = MyloCamera(ip, refresh_token, api_key, device_id, ws)
     async_add_entities([camera])
     _LOGGER.debug("Camera entity created for MYLO %s", device_id)
 
@@ -49,12 +57,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class MyloCamera(Camera):
     """Camera entity that serves the latest snapshot from MYLO."""
 
-    def __init__(self, ip, refresh_token, api_key, device_id):
+    def __init__(self, ip, refresh_token, api_key, device_id, ws):
         super().__init__()
         self._ip = ip
         self._refresh_token = refresh_token
         self._api_key = api_key
         self._device_id = device_id
+        self._ws = ws
+        self._refresh_interval = DEFAULT_REFRESH_INTERVAL
+        self._unsub = None
         self._image = None
 
         self._attr_name = f"Mylo Camera {device_id}"
@@ -66,6 +77,49 @@ class MyloCamera(Camera):
             "model": "MYLO",
             "name": f"MYLO {device_id}",
         }
+
+    async def async_added_to_hass(self):
+        """Handle entity added to hass and start refresh task."""
+        await super().async_added_to_hass()
+        await self._start_timer()
+
+    async def async_will_remove_from_hass(self):
+        """Clean up refresh task when entity is removed."""
+        if self._unsub:
+            self._unsub()
+        await super().async_will_remove_from_hass()
+
+    async def _start_timer(self):
+        """(Re)start the periodic refresh timer."""
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
+        if self._refresh_interval > 0:
+            self._unsub = async_track_time_interval(
+                self.hass,
+                self._scheduled_refresh,
+                timedelta(seconds=self._refresh_interval),
+            )
+
+    async def set_refresh_interval(self, interval: int) -> None:
+        """Update refresh interval and restart timer."""
+        self._refresh_interval = interval
+        if self.hass:
+            await self._start_timer()
+
+    async def _scheduled_refresh(self, now):
+        """Refresh the camera image on a timer."""
+        if not self._ws:
+            _LOGGER.error("WebSocket not available for MYLO refresh")
+            return
+        success = await self._ws.send_getimage()
+        if not success:
+            _LOGGER.error("MYLO did not report new image ready")
+            return
+        image = await download_latest_snapshot(
+            self._device_id, self._refresh_token, self._api_key
+        )
+        self.update_image(image)
 
     async def async_camera_image(self, **kwargs):
         """Return image from MYLO, downloading if necessary."""
@@ -83,3 +137,7 @@ class MyloCamera(Camera):
             self._image = image
             if self.hass:
                 self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self):
+        return {"refresh_interval": self._refresh_interval}
