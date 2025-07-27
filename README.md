@@ -19,7 +19,7 @@ Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Ho
 
 ## Installation
 
-### Via HACS
+### Via HACS (Recommended)
 1. Open [HACS](https://hacs.xyz/) in Home Assistant.
 2. From the **Integrations** tab, open the overflow menu (**⋮**) and select **Custom repositories**.
 3. Enter `https://github.com/jakeyr/coral_mylo_ha` as the repository URL and choose **Integration**.
@@ -50,6 +50,17 @@ The MYLO app authenticates via Apple ID and never exposes the required tokens. T
 These two values will be entered when adding the integration.
 
 ## Adding the Integration
+
+### Via the UI (Recommended)
+1. In Home Assistant, navigate to **Settings → Devices & Services → Add Integration**.
+2. Select **Coral Mylo**.
+3. Provide:
+   - **IP Address** of your MYLO (for example `192.168.1.42`)
+   - **API Key** captured from mitmproxy
+   - **Refresh Token** captured from mitmproxy
+4. Submit the form. The integration queries the MYLO's StatsD service to discover the device ID and then creates the camera and sensor entities.
+
+### Manual Addition
 Instead of using the Home Assistant config flow, you can define the connection manually in `configuration.yaml`:
 
 ```yaml
@@ -66,7 +77,7 @@ mylo_api_key: YOUR_API_KEY
 mylo_refresh_token: YOUR_REFRESH_TOKEN
 ```
 
-Save both files and restart Home Assistant. The integration will start with the camera and sensor entities configured from these values.
+Save both files and restart Home Assistant. 
 
 ## Entities Created
 - `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
