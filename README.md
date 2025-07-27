@@ -6,12 +6,17 @@ Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Ho
 
 ## Features
 - **Camera** entity displaying the most recent MYLO image
-- **Button** to manually refresh the snapshot
+- **Button** to capture a fresh snapshot via Firebase
 - **Sensors** for key pool and weather values collected by MYLO:
   - Water temperature (`°C`)
   - Water level (`cm`)
   - Wind speed (`km/h`)
   - Air quality PM2.5 (`µg/m³`)
+  - Cloudiness status
+  - Health status
+  - Pool status
+  - Battery level
+  - System ping
 
 ## Requirements
 - A running Home Assistant instance (Core or OS)
@@ -82,13 +87,23 @@ Save both files and restart Home Assistant.
 
 ## Entities Created
 - `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
-- `button.mylo_refresh_snapshot` – manually refresh the current snapshot.
+- `button.mylo_refresh_image` – capture a new snapshot on demand.
 - `sensor.mylo_water_temperature` – pool water temperature.
 - `sensor.mylo_water_level` – measured distance from camera to water surface.
 - `sensor.mylo_wind_speed` – outdoor wind speed near the pool.
 - `sensor.mylo_air_quality_pm2_5` – particulate matter reading (PM2.5).
+- `sensor.mylo_cloudiness` – pool water cloudiness.
+- `sensor.mylo_health` – overall device health.
+- `sensor.mylo_pool_status` – current pool status.
+- `sensor.mylo_battery` – MYLO battery level.
+- `sensor.mylo_system_ping` – last system ping timestamp.
 
 The device ID becomes part of each entity's unique ID, ensuring separate MYLO units are differentiated if you add more than one.
+
+### Testing the Refresh Button
+1. In Home Assistant open the **Overview** dashboard.
+2. Locate `button.mylo_refresh_image` and press it.
+3. The camera entity updates once the device reports the new snapshot is ready.
 
 ## How It Works
 1. The integration connects to the MYLO's StatsD admin port (`8126`) to read gauge values. This also reveals the internal device ID used to construct camera and sensor entity IDs.
@@ -96,7 +111,7 @@ The device ID becomes part of each entity's unique ID, ensuring separate MYLO un
 3. With the JWT, it queries Firebase for a one‑time download token associated with `images/coral_<device_id>_last.jpg`.
 4. The final URL containing this token returns the latest snapshot, which Home Assistant exposes as the camera image.
 
-Sensor updates are fetched from StatsD on demand; each update polls MYLO for the latest gauges and extracts the relevant metrics.
+The integration maintains a persistent Firebase WebSocket connection. Image refresh commands and real-time sensor updates flow through this socket. Traditional StatsD polling is still used for metrics not provided over the WebSocket.
 
 ## Troubleshooting
 - **Camera unavailable** – ensure the API key is correct and the refresh token is still valid.
