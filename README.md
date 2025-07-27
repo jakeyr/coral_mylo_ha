@@ -78,7 +78,7 @@ mylo_api_key: YOUR_API_KEY
 mylo_refresh_token: YOUR_REFRESH_TOKEN
 ```
 
-Save both files and restart Home Assistant. 
+Save both files and restart Home Assistant.
 
 ## Entities Created
 - `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
@@ -117,6 +117,11 @@ Pull requests and issues are very welcome! To run the unit tests:
 2. Run the tests from the repository root:
    ```bash
    pytest -q
+   ```
+3. Install the pre-commit hooks so linting runs automatically:
+   ```bash
+   pip install pre-commit
+   pre-commit install
    ```
 
 ## Disclaimer
