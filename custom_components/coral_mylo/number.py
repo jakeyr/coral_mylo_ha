@@ -6,6 +6,7 @@ from .const import DOMAIN, DEFAULT_REFRESH_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up number entity for refresh interval."""
     camera = hass.data.get(DOMAIN, {}).get("cameras", {}).get(entry.entry_id)
@@ -13,6 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.error("Camera entity not available for number setup")
         return
     async_add_entities([MyloRefreshIntervalNumber(camera)])
+
 
 class MyloRefreshIntervalNumber(RestoreEntity, NumberEntity):
     """Number entity to control automatic refresh interval."""
@@ -45,4 +47,3 @@ class MyloRefreshIntervalNumber(RestoreEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         self._value = int(value)
         await self._camera.set_refresh_interval(self._value)
-
