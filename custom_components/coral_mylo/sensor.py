@@ -120,7 +120,15 @@ class MyloRealtimeSensor(Entity):
     async def update_from_ws(self, value):
         """Update state from websocket push message."""
         _LOGGER.debug("Realtime sensor %s received %s", self._path, value)
-        self._state = value
+        if isinstance(value, dict):
+            if "status" in value:
+                self._state = value["status"]
+            elif "level" in value:
+                self._state = value["level"]
+            else:
+                self._state = next(iter(value.values()), None)
+        else:
+            self._state = value
         if self.hass:
             self.async_write_ha_state()
 
