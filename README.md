@@ -1,106 +1,96 @@
-# Coral Mylo Home Assistant Integration
+# Coral Mylo Home Assistant Integration
 
-Bring your **Coral MYLO Pool Camera** (SmartPool MYLO) into Home Assistant with a live camera feed and local sensors.
+Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides several live sensors from the device's StatsD interface.
 
 ## Features
-- Live camera entity in HA
-- Pool and weather sensors from the device’s local StatsD interface
+- **Camera** entity displaying the most recent MYLO image
+- **Sensors** for key pool and weather values collected by MYLO:
+  - Water temperature (`°C`)
+  - Water level (`cm`)
+  - Wind speed (`km/h`)
+  - Air quality PM2.5 (`µg/m³`)
 
 ## Requirements
-- Home Assistant (core or OS)
-- Coral MYLO device on the same LAN
-- A computer that can run *mitmproxy* (required because the MYLO app uses
-  Apple ID login and does not expose the tokens needed by Home Assistant)
+- A running Home Assistant instance (Core or OS)
+- Coral MYLO on the same network as Home Assistant
+- A computer capable of running **mitmproxy**. The MYLO mobile app hides its authentication tokens, so mitmproxy is needed to intercept them for initial setup.
 
 ## Installation
 
 ### Via HACS
-- Open [HACS](https://hacs.xyz/) in Home Assistant.
-- Choose **Integrations** → **+ Explore & Download Repositories**.
-- Search for **Coral Mylo Integration** and install.
+1. Open [HACS](https://hacs.xyz/) in Home Assistant.
+2. Choose **Integrations → + Explore & Download Repositories**.
+3. Search for **Coral Mylo Integration** and install.
 
 ### Manual
-1. Copy the `custom_components/coral_mylo` folder from this repository into `<config>/custom_components/`.
-2. Restart Home Assistant.
+1. Copy the `custom_components/coral_mylo` folder from this repository to `<config>/custom_components/` in your Home Assistant configuration directory.
+2. Restart Home Assistant.
 
-## Setup
+## Obtaining the API Credentials
+The MYLO app authenticates via Apple ID and never exposes the required tokens. To allow Home Assistant to fetch images you must capture the **API Key** and **Refresh Token** once using mitmproxy.
 
-### 1. Discover the MYLO’s IP
-   Find it in your router or scan your subnet:  
-
-```
-nmap -sn 192.168.1.0/24
-```
-
-### 2. Capture **API Key** and **Refresh Token** with *mitmproxy*
-The MYLO mobile app requires you to sign in with an Apple ID and keeps its
-authentication details hidden. Home Assistant needs the API key and refresh
-token in order to fetch a short‑lived JWT that unlocks the snapshot image.
-We use mitmproxy to intercept these values.
-
-1. **Install mitmproxy**  
-   ```
+1. Install mitmproxy:
+   ```bash
    brew install mitmproxy
    ```
-2. **Run mitmproxy** (default port `8080`):  
-   ```
+2. Run mitmproxy (default port `8080`):
+   ```bash
    mitmproxy
    ```
-3. **Set your phone’s Wi‑Fi proxy** to your computer’s IP, port `8080`.
-4. **Install the mitmproxy certificate** on the phone.  
-   Open `http://mitm.it` → follow your OS instructions.
-5. **Launch the MYLO app** and log in.  Traffic will appear in mitmproxy.
-6. **Watch for requests**  
-   - `securetoken.googleapis.com/v1/token?key=YOUR_API_KEY` → copy the `key=` value.  
-   - In the POST body you will see `"refresh_token":"YOUR_REFRESH_TOKEN"` → copy that string.
-7. Save both the **API Key** and **Refresh Token**.
+3. On your phone, set the Wi-Fi proxy to the IP of the computer running mitmproxy, port `8080`.
+4. Open `http://mitm.it` on the phone and install the certificate as instructed.
+5. Launch the MYLO mobile app and log in. Requests will appear in mitmproxy.
+6. Look for a request to `securetoken.googleapis.com/v1/token?key=...` and copy the value of `key=` (this is your **API Key**).
+7. The POST body of the same request contains a `refresh_token` field. Copy this string as your **Refresh Token**.
 
-### 3. Add the integration in Home Assistant
-1. *Settings → Devices & Services → Add Integration*  
-2. Choose **Coral Mylo**.  
-3. Enter:
-   - **IP Address** (e.g. `192.168.1.42`)
-   - **API Key**  
-   - **Refresh Token**
-4. Submit.  HA discovers the device‑ID via StatsD and creates the camera + sensors.
+These two values will be entered when adding the integration.
 
-### 4. Finished
-- `camera.mylo_camera_<id>` now shows the latest snapshot.  
-- Sensors such as water temperature, water level, wind kph, PM2‑5 appear.
+## Adding the Integration
+1. In Home Assistant, navigate to **Settings → Devices & Services → Add Integration**.
+2. Select **Coral Mylo**.
+3. Provide:
+   - **IP Address** of your MYLO (for example `192.168.1.42`)
+   - **API Key** captured from mitmproxy
+   - **Refresh Token** captured from mitmproxy
+4. Submit the form. The integration queries the MYLO's StatsD service to discover the device ID and then creates the camera and sensor entities.
 
-## Troubleshooting
-- **Camera unavailable** → wrong API key or stale refresh token.  
-- **No sensors** → StatsD port `8126` blocked; ensure MYLO and HA are on the same subnet.  
-- Check *Settings → System → Logs* for `custom_components.coral_mylo`.
+## Entities Created
+- `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
+- `sensor.mylo_water_temperature` – pool water temperature.
+- `sensor.mylo_water_level` – measured distance from camera to water surface.
+- `sensor.mylo_wind_speed` – outdoor wind speed near the pool.
+- `sensor.mylo_air_quality_pm2_5` – particulate matter reading (PM2.5).
 
-## Security
-- API Key and Refresh Token are stored in `.storage/core.config_entries` (not plaintext YAML).  
-- Anyone with file‑system access to Home Assistant could read them.
+The device ID becomes part of each entity's unique ID, ensuring separate MYLO units are differentiated if you add more than one.
 
 ## How It Works
-1. TCP StatsD admin (`8126`) returns gauges → extract device‑ID & live metrics.  
-2. Refresh Token + API Key → Google SecureToken → 1‑hour JWT.  
-3. JWT → Firebase metadata → one‑time `downloadTokens` value.  
-4. Final URL `.../images/coral_<id>_last.jpg?token=...` returns the snapshot.
+1. The integration connects to the MYLO's StatsD admin port (`8126`) to read gauge values. This also reveals the internal device ID used to construct camera and sensor entity IDs.
+2. When a camera image is requested, the integration refreshes the short‑lived JWT using your refresh token and API key via Google's SecureToken service.
+3. With the JWT, it queries Firebase for a one‑time download token associated with `images/coral_<device_id>_last.jpg`.
+4. The final URL containing this token returns the latest snapshot, which Home Assistant exposes as the camera image.
 
-## Disclaimer
-This is an **unofficial** integration, not endorsed by Coral Smart Pool.  Use at your own risk.
+Sensor updates are fetched from StatsD on demand; each update polls MYLO for the latest gauges and extracts the relevant metrics.
 
-PRs and issues welcome!
+## Troubleshooting
+- **Camera unavailable** – ensure the API key is correct and the refresh token is still valid.
+- **No sensors** – check that port `8126` on the MYLO is reachable from Home Assistant and that both are on the same network.
+- Review the log under **Settings → System → Logs** and filter for `custom_components.coral_mylo` for details.
+
+## Security
+- The API key and refresh token are stored in Home Assistant's `.storage/core.config_entries` file rather than in plain YAML.
+- Anyone with direct file-system access to Home Assistant can read these tokens, so restrict access to your installation.
 
 ## Development
-
-To run the unit tests:
+Pull requests and issues are very welcome! To run the unit tests:
 
 1. Install the test requirements:
-
    ```bash
    pip install -r requirements-test.txt
    ```
-
-2. Execute the test suite from the repo root:
-
+2. Run the tests from the repository root:
    ```bash
    pytest -q
    ```
 
+## Disclaimer
+This is an **unofficial** integration not endorsed by Coral Smart Pool. Use at your own risk.
