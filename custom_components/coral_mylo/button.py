@@ -6,6 +6,7 @@ from homeassistant.components.button import ButtonEntity
 from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 from .utils import (
     discover_device_id_from_statsd,
+    download_latest_snapshot,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,3 +70,12 @@ class MyloSnapshotRefreshButton(ButtonEntity):
             _LOGGER.error("MYLO did not report new image ready")
             return
         _LOGGER.debug("MYLO %s reported new image", self._device_id)
+
+        if not self._camera:
+            _LOGGER.debug("Camera entity not available to update image")
+            return
+
+        image = await download_latest_snapshot(
+            self._device_id, self._refresh_token, self._api_key
+        )
+        self._camera.update_image(image)
