@@ -64,3 +64,40 @@ async def fetch_firebase_download_token(bucket, path, jwt):
     except Exception as e:
         _LOGGER.error(f"Error fetching download token: {e}")
     return None
+
+
+async def download_latest_snapshot(device_id, refresh_token, api_key):
+    """Return the latest snapshot bytes for the given MYLO device."""
+    bucket = "coralesto.appspot.com"
+    image_path = f"images%2Fcoral_{device_id}_last.jpg"
+
+    jwt = await refresh_jwt(refresh_token, api_key)
+    if not jwt:
+        _LOGGER.error("Failed to refresh JWT")
+        return None
+
+    token = await fetch_firebase_download_token(bucket, image_path, jwt)
+    if not token:
+        _LOGGER.error("Failed to fetch download token")
+        return None
+
+    image_url = (
+        f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o/"
+        f"{image_path}?alt=media&token={token}"
+    )
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as resp:
+                if resp.status == 200:
+                    return await resp.read()
+                text = await resp.text()
+                _LOGGER.error(
+                    "Failed to fetch image: %s, Response: %s",
+                    resp.status,
+                    text,
+                )
+    except Exception as e:
+        _LOGGER.error("Exception fetching camera image: %s", e)
+
+    return None

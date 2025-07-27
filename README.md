@@ -6,6 +6,7 @@ Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Ho
 
 ## Features
 - **Camera** entity displaying the most recent MYLO image
+- **Button** to manually refresh the snapshot
 - **Sensors** for key pool and weather values collected by MYLO:
   - Water temperature (`°C`)
   - Water level (`cm`)
@@ -81,6 +82,7 @@ Save both files and restart Home Assistant.
 
 ## Entities Created
 - `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
+- `button.mylo_refresh_snapshot` – manually refresh the current snapshot.
 - `sensor.mylo_water_temperature` – pool water temperature.
 - `sensor.mylo_water_level` – measured distance from camera to water surface.
 - `sensor.mylo_wind_speed` – outdoor wind speed near the pool.
