@@ -1,3 +1,5 @@
+"""MYLO button entity implementation."""
+
 import logging
 from homeassistant.components.button import ButtonEntity
 
@@ -10,10 +12,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the snapshot refresh button for a config entry."""
+    _LOGGER.debug("Setting up button for entry %s", entry.entry_id)
     ip = entry.data[CONF_IP_ADDRESS]
     refresh_token = entry.data[CONF_REFRESH_TOKEN]
     api_key = entry.data[CONF_API_KEY]
 
+    # Use cached device id if available
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
         device_id = await hass.async_add_executor_job(
@@ -50,6 +55,8 @@ class MyloSnapshotRefreshButton(ButtonEntity):
         }
 
     async def async_press(self) -> None:
+        """Handle button press from Home Assistant."""
+        _LOGGER.debug("Refresh button pressed for MYLO %s", self._device_id)
         await self._refresh_snapshot()
 
     async def _refresh_snapshot(self):
@@ -61,3 +68,4 @@ class MyloSnapshotRefreshButton(ButtonEntity):
         if not success:
             _LOGGER.error("MYLO did not report new image ready")
             return
+        _LOGGER.debug("MYLO %s reported new image", self._device_id)
