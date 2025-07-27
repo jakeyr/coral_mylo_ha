@@ -85,6 +85,8 @@ mylo_refresh_token: YOUR_REFRESH_TOKEN
 
 Save both files and restart Home Assistant.
 
+The integration automatically creates `number.mylo_refresh_interval` with a default of 300 seconds. Adjust this value to change how often snapshots refresh.
+
 ## Entities Created
 - `camera.mylo_camera_<id>` – shows the most recent snapshot taken by the MYLO.
 - `button.mylo_refresh_image` – capture a new snapshot on demand.
@@ -97,6 +99,7 @@ Save both files and restart Home Assistant.
 - `sensor.mylo_pool_status` – current pool status.
 - `sensor.mylo_battery` – MYLO battery level.
 - `sensor.mylo_system_ping` – last system ping timestamp.
+- `number.mylo_refresh_interval` – how often to automatically refresh snapshots (defaults to 300 seconds).
 
 The device ID becomes part of each entity's unique ID, ensuring separate MYLO units are differentiated if you add more than one.
 
@@ -104,6 +107,7 @@ The device ID becomes part of each entity's unique ID, ensuring separate MYLO un
 1. In Home Assistant open the **Overview** dashboard.
 2. Locate `button.mylo_refresh_image` and press it.
 3. The camera entity updates once the device reports the new snapshot is ready.
+   It also refreshes periodically based on `number.mylo_refresh_interval`.
 
 ## How It Works
 1. The integration connects to the MYLO's StatsD admin port (`8126`) to read gauge values. This also reveals the internal device ID used to construct camera and sensor entity IDs.
@@ -111,7 +115,7 @@ The device ID becomes part of each entity's unique ID, ensuring separate MYLO un
 3. With the JWT, it queries Firebase for a one‑time download token associated with `images/coral_<device_id>_last.jpg`.
 4. The final URL containing this token returns the latest snapshot, which Home Assistant exposes as the camera image.
 
-The integration maintains a persistent Firebase WebSocket connection. Image refresh commands and real-time sensor updates flow through this socket. Traditional StatsD polling is still used for metrics not provided over the WebSocket.
+The integration maintains a persistent Firebase WebSocket connection. Image refresh commands, including the periodic updates controlled by `number.mylo_refresh_interval`, and real-time sensor updates flow through this socket. Traditional StatsD polling is still used for metrics not provided over the WebSocket.
 
 ## Troubleshooting
 - **Camera unavailable** – ensure the API key is correct and the refresh token is still valid.
