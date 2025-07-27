@@ -205,7 +205,9 @@ class MyloWebsocketClient:
                         continue
                     path = data.get("d", {}).get("b", {}).get("p")
                     payload = data.get("d", {}).get("b", {}).get("d")
-                    norm_path = f"/{path}" if path and not path.startswith("/") else path
+                    norm_path = (
+                        f"/{path}" if path and not path.startswith("/") else path
+                    )
                     _LOGGER.debug("WS message on %s: %s", path, payload)
                     if norm_path == f"/pooldevices/{self._device_id}/imgready":
                         self._img_event.set()
