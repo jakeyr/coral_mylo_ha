@@ -189,7 +189,7 @@ class MyloWebsocketClient:
                 self._rid += 1
                 # subscribe to sensors and imgready
                 for path in list(self._sensor_callbacks.keys()) + [
-                    f"/pooldevices/{self._device_id}/imgready"
+                    f"pooldevices/{self._device_id}/imgready"
                 ]:
                     await self._send(
                         {"t": "d", "d": {"r": self._rid, "a": "q", "b": {"p": path}}}
@@ -205,11 +205,12 @@ class MyloWebsocketClient:
                         continue
                     path = data.get("d", {}).get("b", {}).get("p")
                     payload = data.get("d", {}).get("b", {}).get("d")
+                    norm_path = f"/{path}" if path and not path.startswith("/") else path
                     _LOGGER.debug("WS message on %s: %s", path, payload)
-                    if path == f"pooldevices/{self._device_id}/imgready":
+                    if norm_path == f"/pooldevices/{self._device_id}/imgready":
                         self._img_event.set()
-                    elif path in self._sensor_callbacks:
-                        cb = self._sensor_callbacks[path]
+                    elif norm_path in self._sensor_callbacks:
+                        cb = self._sensor_callbacks[norm_path]
                         self._hass.async_create_task(cb(payload))
             except Exception as e:
                 _LOGGER.error("WebSocket connection error: %s", e)
