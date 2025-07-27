@@ -1,13 +1,11 @@
 """Config flow for the Coral Mylo integration."""
 
 import logging
-
 from homeassistant import config_entries
 import voluptuous as vol
+from .const import DOMAIN, CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY
 
 _LOGGER = logging.getLogger(__name__)
-
-from .const import DOMAIN, CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY
 
 
 class CoralMyloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

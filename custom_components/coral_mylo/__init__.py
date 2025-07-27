@@ -57,6 +57,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.data[DOMAIN]["cameras"].pop(entry.entry_id, None)
         ws = hass.data[DOMAIN].get("ws", {}).pop(entry.entry_id, None)
         if ws:
+            device_id = hass.data[DOMAIN].get("device_ids", {}).get(entry.entry_id)
             _LOGGER.debug("Stopping websocket for %s", device_id)
             await ws.stop()
         hass.data[DOMAIN].get("device_ids", {}).pop(entry.entry_id, None)
