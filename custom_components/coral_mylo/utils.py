@@ -161,12 +161,18 @@ class MyloWebsocketClient:
                     continue
                 self._ws = await self._session.ws_connect(url)
                 self._rid = 1
-                await self._send({"t": "d", "d": {"r": self._rid, "a": "auth", "b": {"cred": jwt}}})
+                await self._send(
+                    {"t": "d", "d": {"r": self._rid, "a": "auth", "b": {"cred": jwt}}}
+                )
                 await asyncio.wait_for(self._ws.receive(), timeout=5)
                 self._rid += 1
                 # subscribe to sensors and imgready
-                for path in list(self._sensor_callbacks.keys()) + [f"/pooldevices/{self._device_id}/imgready"]:
-                    await self._send({"t": "d", "d": {"r": self._rid, "a": "q", "b": {"p": path}}})
+                for path in list(self._sensor_callbacks.keys()) + [
+                    f"/pooldevices/{self._device_id}/imgready"
+                ]:
+                    await self._send(
+                        {"t": "d", "d": {"r": self._rid, "a": "q", "b": {"p": path}}}
+                    )
                     self._rid += 1
                 self._connected.set()
                 async for msg in self._ws:
@@ -194,17 +200,22 @@ class MyloWebsocketClient:
         await self._connected.wait()
         self._img_event.clear()
         self._rid += 1
-        await self._send({
-            "t": "d",
-            "d": {
-                "r": self._rid,
-                "a": "m",
-                "b": {
-                    "p": f"/pooldevices/{self._device_id}/getimage",
-                    "d": {"device": mobile_id, "time": str(int(time.time() * 1000))},
+        await self._send(
+            {
+                "t": "d",
+                "d": {
+                    "r": self._rid,
+                    "a": "m",
+                    "b": {
+                        "p": f"/pooldevices/{self._device_id}/getimage",
+                        "d": {
+                            "device": mobile_id,
+                            "time": str(int(time.time() * 1000)),
+                        },
+                    },
                 },
-            },
-        })
+            }
+        )
         try:
             await asyncio.wait_for(self._img_event.wait(), timeout=timeout)
             return True

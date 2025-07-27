@@ -1,6 +1,10 @@
 import logging
 from homeassistant.helpers.entity import Entity
-from .utils import discover_device_id_from_statsd, read_gauges_from_statsd, MyloWebsocketClient
+from .utils import (
+    discover_device_id_from_statsd,
+    read_gauges_from_statsd,
+    MyloWebsocketClient,
+)
 from .const import CONF_IP_ADDRESS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -10,7 +14,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
         if not device_id:
             _LOGGER.error("Could not discover device ID for sensors")
             return

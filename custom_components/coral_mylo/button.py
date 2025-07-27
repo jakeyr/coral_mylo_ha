@@ -4,7 +4,6 @@ from homeassistant.components.button import ButtonEntity
 from .const import CONF_IP_ADDRESS, CONF_REFRESH_TOKEN, CONF_API_KEY, DOMAIN
 from .utils import (
     discover_device_id_from_statsd,
-    MyloWebsocketClient,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,7 +16,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
         if not device_id:
             _LOGGER.error("Could not discover device ID for button")
             return
@@ -25,9 +26,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
     camera = hass.data.get(DOMAIN, {}).get("cameras", {}).get(entry.entry_id)
 
-    async_add_entities([
-        MyloSnapshotRefreshButton(refresh_token, api_key, device_id, camera, ws)
-    ])
+    async_add_entities(
+        [MyloSnapshotRefreshButton(refresh_token, api_key, device_id, camera, ws)]
+    )
 
 
 class MyloSnapshotRefreshButton(ButtonEntity):
@@ -60,4 +61,3 @@ class MyloSnapshotRefreshButton(ButtonEntity):
         if not success:
             _LOGGER.error("MYLO did not report new image ready")
             return
-

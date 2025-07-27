@@ -16,7 +16,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
         if not device_id:
             _LOGGER.error("Could not discover device ID from StatsD")
             return
@@ -29,9 +31,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     hass.data.setdefault(DOMAIN, {}).setdefault("cameras", {})[entry.entry_id] = camera
 
     if ws:
+
         async def _update(_):
             image = await download_latest_snapshot(device_id, refresh_token, api_key)
             camera.update_image(image)
+
         ws.register_sensor(f"/pooldevices/{device_id}/imgready", _update)
 
 
