@@ -15,7 +15,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ip = entry.data[CONF_IP_ADDRESS]
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
         if not device_id:
             _LOGGER.error("Could not discover device ID for binary sensors")
             return
@@ -31,8 +33,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ws.register_sensor(health_path, health.update_from_ws)
         _LOGGER.debug("Registered realtime sensor for %s", health_path)
 
-        person = MyloLogBinarySensor(hass, device_id, "Person Detected in Pool", "person detected in your pool")
-        near = MyloLogBinarySensor(hass, device_id, "Someone Detected Near Pool", "detected near the pool")
+        person = MyloLogBinarySensor(
+            hass, device_id, "Person Detected in Pool", "person detected in your pool"
+        )
+        near = MyloLogBinarySensor(
+            hass, device_id, "Someone Detected Near Pool", "detected near the pool"
+        )
         entities.extend([person, near])
 
         handler = MyloLogHandler(hass, [person, near])

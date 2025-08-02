@@ -109,7 +109,15 @@ class MyloSensor(Entity):
 class MyloRealtimeSensor(Entity):
     """Sensor updated from Firebase websocket."""
 
-    def __init__(self, device_id, name, path, ws: MyloWebsocketClient, unit=None, device_class=None):
+    def __init__(
+        self,
+        device_id,
+        name,
+        path,
+        ws: MyloWebsocketClient,
+        unit=None,
+        device_class=None,
+    ):
         self._device_id = device_id
         self._name = name
         self._path = path
