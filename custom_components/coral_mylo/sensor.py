@@ -39,18 +39,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
     realtime = []
     if ws:
         realtime_specs = [
-            ("cloudiness", "Cloudiness"),
-            ("health", "Health"),
-            ("pool_status", "Pool Status"),
-            ("battery", "Battery"),
-            ("system_ping", "System Ping"),
+            ("status/cloudiness", "Cloudiness", None, None),
+            ("status/pool_status", "Pool Status", None, None),
+            ("status/battery", "Battery", None, None),
+            ("status/system_ping", "System Ping", None, None),
+            ("status/temperature/cpu", "CPU Temperature", "°C", None),
+            ("status/temperature/gpu", "GPU Temperature", "°C", None),
+            ("status/memory", "Memory Usage", None, None),
+            ("status/balena_update/status", "Update Status", None, None),
+            (
+                "monitoring/last_off_notification",
+                "Last Off Notification",
+                None,
+                "timestamp",
+            ),
         ]
-        for key, name in realtime_specs:
-            path = f"/pooldevices/{device_id}/status/{key}"
-            ent = MyloRealtimeSensor(device_id, name, path, ws)
+        for path, name, unit, device_class in realtime_specs:
+            full_path = f"/pooldevices/{device_id}/{path}"
+            ent = MyloRealtimeSensor(device_id, name, full_path, ws, unit, device_class)
             realtime.append(ent)
-            ws.register_sensor(path, ent.update_from_ws)
-            _LOGGER.debug("Registered realtime sensor for %s", path)
+            ws.register_sensor(full_path, ent.update_from_ws)
+            _LOGGER.debug("Registered realtime sensor for %s", full_path)
 
     async_add_entities(sensors + realtime, update_before_add=True)
 
@@ -100,7 +109,7 @@ class MyloSensor(Entity):
 class MyloRealtimeSensor(Entity):
     """Sensor updated from Firebase websocket."""
 
-    def __init__(self, device_id, name, path, ws: MyloWebsocketClient):
+    def __init__(self, device_id, name, path, ws: MyloWebsocketClient, unit=None, device_class=None):
         self._device_id = device_id
         self._name = name
         self._path = path
@@ -110,6 +119,10 @@ class MyloRealtimeSensor(Entity):
         uid = path.replace("/", "_").strip("_")
         self._attr_unique_id = f"mylo_{uid}"
         self._attr_should_poll = False
+        if unit:
+            self._attr_unit_of_measurement = unit
+        if device_class:
+            self._attr_device_class = device_class
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device_id)},
             "manufacturer": "Coral SmartPool",
