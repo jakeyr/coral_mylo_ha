@@ -66,6 +66,7 @@ const_module.SensorDeviceClass = types.SimpleNamespace(
     DATE="date",
 )
 sys.modules["homeassistant.const"] = const_module
+sensor_module.SensorDeviceClass = const_module.SensorDeviceClass
 
 # Ensure packages exist without executing integration __init__
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
