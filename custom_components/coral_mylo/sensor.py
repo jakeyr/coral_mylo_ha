@@ -1,7 +1,17 @@
 """Sensor entities for MYLO."""
 
 import logging
-from homeassistant.helpers.entity import Entity
+
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import (
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    PERCENTAGE,
+    SensorDeviceClass,
+    UnitOfLength,
+    UnitOfSpeed,
+    UnitOfTemperature,
+)
+
 from .utils import (
     discover_device_id_from_statsd,
     read_gauges_from_statsd,
@@ -29,29 +39,64 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
 
     metrics = [
-        ("water.temperature", "Water Temperature", "°C"),
-        ("water.level", "Water Level", "cm"),
-        ("weather.wind_kph", "Wind Speed", "km/h"),
-        ("weather.aq_pm2_5", "Air Quality PM2.5", "µg/m³"),
+        (
+            "water.temperature",
+            "Water Temperature",
+            UnitOfTemperature.CELSIUS,
+            SensorDeviceClass.TEMPERATURE,
+        ),
+        (
+            "water.level",
+            "Water Level",
+            UnitOfLength.CENTIMETERS,
+            SensorDeviceClass.DISTANCE,
+        ),
+        (
+            "weather.wind_kph",
+            "Wind Speed",
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+            SensorDeviceClass.WIND_SPEED,
+        ),
+        (
+            "weather.aq_pm2_5",
+            "Air Quality PM2.5",
+            CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+            SensorDeviceClass.PM25,
+        ),
     ]
 
-    sensors = [MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics]
+    sensors = [MyloSensor(ip, device_id, m, n, u, dc) for m, n, u, dc in metrics]
     realtime = []
     if ws:
         realtime_specs = [
-            ("status/cloudiness", "Cloudiness", None, None),
+            ("status/cloudiness", "Cloudiness", PERCENTAGE, None),
             ("status/pool_status", "Pool Status", None, None),
-            ("status/battery", "Battery", None, None),
+            (
+                "status/battery",
+                "Battery",
+                PERCENTAGE,
+                SensorDeviceClass.BATTERY,
+            ),
             ("status/system_ping", "System Ping", None, None),
-            ("status/temperature/cpu", "CPU Temperature", "°C", None),
-            ("status/temperature/gpu", "GPU Temperature", "°C", None),
+            (
+                "status/temperature/cpu",
+                "CPU Temperature",
+                UnitOfTemperature.CELSIUS,
+                SensorDeviceClass.TEMPERATURE,
+            ),
+            (
+                "status/temperature/gpu",
+                "GPU Temperature",
+                UnitOfTemperature.CELSIUS,
+                SensorDeviceClass.TEMPERATURE,
+            ),
             ("status/memory", "Memory Usage", None, None),
             ("status/balena_update/status", "Update Status", None, None),
             (
                 "monitoring/last_off_notification",
                 "Last Off Notification",
                 None,
-                "timestamp",
+                SensorDeviceClass.DATE,
             ),
         ]
         for path, name, unit, device_class in realtime_specs:
@@ -64,15 +109,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(sensors + realtime, update_before_add=True)
 
 
-class MyloSensor(Entity):
+class MyloSensor(SensorEntity):
     """Sensor that polls values from the MYLO StatsD service."""
 
-    def __init__(self, ip, device_id, metric, name, unit):
+    def __init__(self, ip, device_id, metric, name, unit, device_class=None):
+        """Initialize the MYLO sensor."""
         self._ip = ip
         self._device_id = device_id
         self._metric = metric
-        self._name = name
-        self._unit = unit
         self._state = None
         self._attr_name = f"Mylo {name}"
         self._attr_unique_id = f"mylo_{device_id}_{metric.replace('.', '_')}"
@@ -83,6 +127,9 @@ class MyloSensor(Entity):
             "model": "MYLO",
             "name": f"MYLO {device_id}",
         }
+        self._attr_native_unit_of_measurement = unit
+        if device_class:
+            self._attr_device_class = device_class
 
     async def async_update(self):
         """Fetch latest value from the MYLO StatsD server."""
@@ -95,18 +142,15 @@ class MyloSensor(Entity):
         if value is not None:
             self._state = value
         else:
-            _LOGGER.warning(f"No data found for metric {full_key}")
+            _LOGGER.warning("No data found for metric %s", full_key)
 
     @property
-    def state(self):
+    def native_value(self):
+        """Return the current value of the sensor."""
         return self._state
 
-    @property
-    def unit_of_measurement(self):
-        return self._unit
 
-
-class MyloRealtimeSensor(Entity):
+class MyloRealtimeSensor(SensorEntity):
     """Sensor updated from Firebase websocket."""
 
     def __init__(
@@ -128,7 +172,7 @@ class MyloRealtimeSensor(Entity):
         self._attr_unique_id = f"mylo_{uid}"
         self._attr_should_poll = False
         if unit:
-            self._attr_unit_of_measurement = unit
+            self._attr_native_unit_of_measurement = unit
         if device_class:
             self._attr_device_class = device_class
         self._attr_device_info = {
@@ -154,5 +198,6 @@ class MyloRealtimeSensor(Entity):
             self.async_write_ha_state()
 
     @property
-    def state(self):
+    def native_value(self):
+        """Return the current value of the sensor."""
         return self._state
