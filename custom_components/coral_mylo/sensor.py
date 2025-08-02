@@ -2,11 +2,10 @@
 
 import logging
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.const import (
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     PERCENTAGE,
-    SensorDeviceClass,
     UnitOfLength,
     UnitOfSpeed,
     UnitOfTemperature,
