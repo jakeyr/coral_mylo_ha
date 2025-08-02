@@ -32,4 +32,4 @@ jobs:
         with:
           tag: ${{ steps.version.outputs.version }}
           commit: ${{ github.sha }}
-          generate_release_notes: true
+          generateReleaseNotes: true
