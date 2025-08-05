@@ -49,6 +49,10 @@ class SensorEntity(Entity):
     def device_class(self):
         return getattr(self, "_attr_device_class", None)
 
+    @property
+    def extra_state_attributes(self):
+        return getattr(self, "_attr_extra_state_attributes", None)
+
 
 sensor_module.SensorEntity = SensorEntity
 sys.modules["homeassistant.components.sensor"] = sensor_module
@@ -213,3 +217,17 @@ def test_last_off_notification_parses_date():
 
     assert isinstance(last_off.native_value, date)
     assert last_off.native_value == date(2025, 7, 29)
+
+
+def test_memory_usage_parses_components():
+    """Ensure memory usage string is parsed into sub values."""
+
+    memory = sensor.MyloRealtimeSensor("dev1", "Memory Usage", "/status/memory", None)
+
+    asyncio.run(memory.update_from_ws("used: 78.0%, available: 873MB, swap is at 41%"))
+
+    assert memory.native_value == 78.0
+    assert memory.extra_state_attributes == {
+        "available_mb": 873,
+        "swap_percent": 41.0,
+    }
