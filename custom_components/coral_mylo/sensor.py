@@ -8,8 +8,10 @@ from homeassistant.const import (
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     PERCENTAGE,
     UnitOfLength,
+    UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 from .utils import (
@@ -52,6 +54,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
             SensorDeviceClass.DISTANCE,
         ),
         (
+            "water.pressure_sensor",
+            "Water Pressure",
+            UnitOfPressure.MBAR,
+            SensorDeviceClass.PRESSURE,
+        ),
+        (
+            "water.cloudiness",
+            "Water Cloudiness",
+            PERCENTAGE,
+            None,
+        ),
+        (
             "weather.wind_kph",
             "Wind Speed",
             UnitOfSpeed.KILOMETERS_PER_HOUR,
@@ -62,6 +76,60 @@ async def async_setup_entry(hass, entry, async_add_entities):
             "Air Quality PM2.5",
             CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
             SensorDeviceClass.PM25,
+        ),
+        (
+            "weather.aq_pm10",
+            "Air Quality PM10",
+            CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+            SensorDeviceClass.PM10,
+        ),
+        (
+            "weather.precip_mm.count",
+            "Precipitation",
+            UnitOfLength.MILLIMETERS,
+            SensorDeviceClass.PRECIPITATION,
+        ),
+        (
+            "weather.vis_km",
+            "Visibility",
+            UnitOfLength.KILOMETERS,
+            SensorDeviceClass.DISTANCE,
+        ),
+        (
+            "weather.pressure_mb",
+            "Atmospheric Pressure",
+            UnitOfPressure.MBAR,
+            SensorDeviceClass.PRESSURE,
+        ),
+        (
+            "darkness",
+            "Darkness",
+            PERCENTAGE,
+            None,
+        ),
+        (
+            "manager.alert_level",
+            "Alert Level",
+            None,
+            None,
+        ),
+        (
+            "pool.used.count",
+            "Pool Used Count",
+            None,
+            None,
+        ),
+        (
+            "robot.count",
+            "Robot Count",
+            None,
+            None,
+        ),
+        (
+            "statsd.timestamp_lag",
+            "StatsD Timestamp Lag",
+            UnitOfTime.SECONDS,
+            SensorDeviceClass.DURATION,
         ),
     ]
 
