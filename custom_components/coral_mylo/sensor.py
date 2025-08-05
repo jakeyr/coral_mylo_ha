@@ -18,6 +18,7 @@ from .utils import (
     discover_device_id_from_statsd,
     read_gauges_from_statsd,
     MyloWebsocketClient,
+    parse_memory_usage,
 )
 from .const import CONF_IP_ADDRESS, DOMAIN
 
@@ -201,7 +202,11 @@ class MyloSensor(SensorEntity):
 
     async def async_update(self):
         """Fetch latest value from the MYLO StatsD server."""
-        full_key = f"coral.{self._device_id}.{self._metric}"
+        full_key = (
+            self._metric
+            if self._metric.startswith("statsd.")
+            else f"coral.{self._device_id}.{self._metric}"
+        )
         _LOGGER.debug("Querying gauge %s on %s", full_key, self._ip)
         gauges = await self.hass.async_add_executor_job(
             read_gauges_from_statsd, self._ip
@@ -253,7 +258,17 @@ class MyloRealtimeSensor(SensorEntity):
     async def update_from_ws(self, value):
         """Update state from websocket push message."""
         _LOGGER.debug("Realtime sensor %s received %s", self._path, value)
-        if isinstance(value, dict):
+        if isinstance(value, str) and self._path.endswith("/status/memory"):
+            parsed = parse_memory_usage(value)
+            if parsed:
+                self._state = parsed["used_percent"]
+                self._attr_extra_state_attributes = {
+                    "available_mb": parsed["available_mb"],
+                    "swap_percent": parsed["swap_percent"],
+                }
+            else:
+                self._state = value
+        elif isinstance(value, dict):
             if "status" in value:
                 self._state = value["status"]
             elif "level" in value:
