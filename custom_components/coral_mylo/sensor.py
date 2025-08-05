@@ -180,6 +180,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ws.register_sensor(full_path, ent.update_from_ws)
             _LOGGER.debug("Registered realtime sensor for %s", full_path)
 
+        state_sensor = MyloPoolStateSensor(device_id, ws)
+        realtime.append(state_sensor)
+        ws.register_sensor(state_sensor.path, state_sensor.update_from_ws)
+        _LOGGER.debug("Registered realtime sensor for %s", state_sensor.path)
+
     async_add_entities(sensors + realtime, update_before_add=True)
 
 
@@ -314,4 +319,51 @@ class MyloRealtimeSensor(SensorEntity):
     @property
     def native_value(self):
         """Return the current value of the sensor."""
+        return self._state
+
+
+class MyloPoolStateSensor(SensorEntity):
+    """Sensor representing the pool occupancy state."""
+
+    _STATE_MAP = {1: "empty", 2: "near_pool", 3: "in_pool"}
+
+    def __init__(self, device_id: str, ws: MyloWebsocketClient | None):
+        self._device_id = device_id
+        self._ws = ws
+        self._path = f"/pooldevices/{device_id}/state_log"
+        self._state: str | None = None
+        self._attr_name = "Mylo Pool State"
+        self._attr_unique_id = f"mylo_{device_id}_pool_state"
+        self._attr_should_poll = False
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device_id)},
+            "manufacturer": "Coral SmartPool",
+            "model": "MYLO",
+            "name": f"MYLO {device_id}",
+        }
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    async def update_from_ws(self, value):
+        """Update the sensor from websocket messages."""
+        _LOGGER.debug("Pool state sensor received %s", value)
+        if isinstance(value, list):
+            entry = value[-1] if value else {}
+        elif isinstance(value, dict):
+            entry = value
+        else:
+            entry = {"state": value}
+
+        code = entry.get("state")
+        self._state = self._STATE_MAP.get(code)
+        ts = entry.get("timestamp")
+        if ts:
+            self._attr_extra_state_attributes = {"timestamp": ts}
+        if getattr(self, "hass", None):
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self):
         return self._state
