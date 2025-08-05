@@ -1,6 +1,5 @@
 """Sensor entities for MYLO."""
 
-from datetime import datetime
 import logging
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
@@ -14,6 +13,7 @@ from homeassistant.const import (
     UnitOfTime,
 )
 
+from homeassistant.util import dt as dt_util
 from .utils import (
     discover_device_id_from_statsd,
     read_gauges_from_statsd,
@@ -146,7 +146,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 PERCENTAGE,
                 SensorDeviceClass.BATTERY,
             ),
-            ("status/system_ping", "System Ping", None, None),
+            (
+                "status/system_ping",
+                "System Ping",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+            ),
             (
                 "status/temperature/cpu",
                 "CPU Temperature",
@@ -212,6 +217,12 @@ class MyloSensor(SensorEntity):
             read_gauges_from_statsd, self._ip
         )
         value = gauges.get(full_key)
+        if isinstance(value, str):
+            dt = dt_util.parse_datetime(value.replace("Z", "+00:00"))
+            if dt is not None:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=dt_util.UTC)
+                value = dt_util.as_local(dt)
         if value is not None:
             self._state = value
         else:
@@ -278,10 +289,20 @@ class MyloRealtimeSensor(SensorEntity):
         else:
             self._state = value
 
-        if isinstance(self._state, str) and self.device_class == SensorDeviceClass.DATE:
-            try:
-                self._state = datetime.fromisoformat(self._state).date()
-            except ValueError:
+        if isinstance(self._state, str):
+            dt = dt_util.parse_datetime(self._state.replace("Z", "+00:00"))
+            if dt is not None:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=dt_util.UTC)
+                dt = dt_util.as_local(dt)
+                if self.device_class == SensorDeviceClass.DATE:
+                    self._state = dt.date()
+                else:
+                    self._state = dt
+            elif self.device_class in (
+                SensorDeviceClass.DATE,
+                SensorDeviceClass.TIMESTAMP,
+            ):
                 _LOGGER.warning(
                     "Invalid date format for %s: %s", self._path, self._state
                 )

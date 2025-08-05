@@ -5,7 +5,8 @@ from pathlib import Path
 import sys
 import types
 import asyncio
-from datetime import date
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 
 # Stub out Home Assistant modules required for importing the integration
@@ -17,6 +18,39 @@ sys.modules.setdefault("homeassistant", ha)
 sys.modules.setdefault(
     "homeassistant.helpers", types.ModuleType("homeassistant.helpers")
 )
+
+# Minimal dt utilities
+ha_util = types.ModuleType("homeassistant.util")
+sys.modules.setdefault("homeassistant.util", ha_util)
+helpers_dt = types.ModuleType("homeassistant.util.dt")
+helpers_dt.UTC = timezone.utc
+helpers_dt.DEFAULT_TIME_ZONE = timezone.utc
+
+
+def set_default_time_zone(tz):
+    helpers_dt.DEFAULT_TIME_ZONE = tz
+
+
+def get_time_zone(name):
+    return ZoneInfo(name)
+
+
+def parse_datetime(val: str):
+    try:
+        return datetime.fromisoformat(val)
+    except ValueError:
+        return None
+
+
+def as_local(dt):
+    return dt.astimezone(helpers_dt.DEFAULT_TIME_ZONE)
+
+
+helpers_dt.set_default_time_zone = set_default_time_zone
+helpers_dt.get_time_zone = get_time_zone
+helpers_dt.parse_datetime = parse_datetime
+helpers_dt.as_local = as_local
+sys.modules["homeassistant.util.dt"] = helpers_dt
 
 helpers_entity = types.ModuleType("homeassistant.helpers.entity")
 
@@ -80,6 +114,7 @@ const_module.SensorDeviceClass = types.SimpleNamespace(
     DURATION="duration",
     BATTERY="battery",
     DATE="date",
+    TIMESTAMP="timestamp",
 )
 sys.modules["homeassistant.const"] = const_module
 sensor_module.SensorDeviceClass = const_module.SensorDeviceClass
@@ -217,6 +252,48 @@ def test_last_off_notification_parses_date():
 
     assert isinstance(last_off.native_value, date)
     assert last_off.native_value == date(2025, 7, 29)
+
+
+def test_last_off_notification_respects_timezone():
+    """Date strings are assumed UTC and converted to local time zone."""
+
+    last_off = sensor.MyloRealtimeSensor(
+        "dev1",
+        "Last Off Notification",
+        "/monitoring/last_off_notification",
+        None,
+        None,
+        const_module.SensorDeviceClass.DATE,
+    )
+
+    dt_util = sensor.dt_util
+
+    dt_util.set_default_time_zone(dt_util.get_time_zone("Asia/Tokyo"))
+    asyncio.run(last_off.update_from_ws("2025-07-29T23:30:00+00:00"))
+    assert last_off.native_value == date(2025, 7, 30)
+    dt_util.set_default_time_zone(dt_util.UTC)
+
+
+def test_system_ping_respects_timezone():
+    """Timestamp strings are assumed UTC and converted to local time zone."""
+
+    ping = sensor.MyloRealtimeSensor(
+        "dev1",
+        "System Ping",
+        "/status/system_ping",
+        None,
+        None,
+        const_module.SensorDeviceClass.TIMESTAMP,
+    )
+
+    dt_util = sensor.dt_util
+
+    dt_util.set_default_time_zone(dt_util.get_time_zone("America/New_York"))
+    asyncio.run(ping.update_from_ws("2025-07-29T12:00:00"))
+    assert ping.native_value == datetime(
+        2025, 7, 29, 8, 0, tzinfo=ZoneInfo("America/New_York")
+    )
+    dt_util.set_default_time_zone(dt_util.UTC)
 
 
 def test_memory_usage_parses_components():

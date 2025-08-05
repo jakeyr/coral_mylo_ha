@@ -1,10 +1,11 @@
 """Binary sensors for MYLO."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 from .utils import discover_device_id_from_statsd
 from .const import CONF_IP_ADDRESS, DOMAIN
 
@@ -157,13 +158,14 @@ class MyloLogHandler:
 
     @staticmethod
     def _parse_timestamp(ts: str) -> datetime | None:
-        """Return a timezone-aware UTC datetime for the timestamp string."""
+        """Return a timezone-aware datetime adjusted to Home Assistant's timezone."""
         try:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            dt = dt_util.parse_datetime(ts.replace("Z", "+00:00"))
+            if dt is None:
+                raise ValueError
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            else:
-                dt = dt.astimezone(timezone.utc)
+                dt = dt.replace(tzinfo=dt_util.UTC)
+            dt = dt_util.as_local(dt)
             return dt
         except ValueError:
             _LOGGER.warning("Invalid timestamp format: %s", ts)

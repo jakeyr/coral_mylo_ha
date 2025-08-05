@@ -5,6 +5,8 @@ import importlib.util
 from pathlib import Path
 import sys
 import types
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 # Stub modules required for import
 sys.modules.setdefault("aiohttp", types.ModuleType("aiohttp"))
@@ -15,6 +17,39 @@ sys.modules.setdefault("homeassistant", ha)
 sys.modules.setdefault(
     "homeassistant.helpers", types.ModuleType("homeassistant.helpers")
 )
+
+# Minimal dt utilities
+ha_util = types.ModuleType("homeassistant.util")
+sys.modules.setdefault("homeassistant.util", ha_util)
+helpers_dt = types.ModuleType("homeassistant.util.dt")
+helpers_dt.UTC = timezone.utc
+helpers_dt.DEFAULT_TIME_ZONE = timezone.utc
+
+
+def set_default_time_zone(tz):
+    helpers_dt.DEFAULT_TIME_ZONE = tz
+
+
+def get_time_zone(name):
+    return ZoneInfo(name)
+
+
+def parse_datetime(val: str):
+    try:
+        return datetime.fromisoformat(val)
+    except ValueError:
+        return None
+
+
+def as_local(dt):
+    return dt.astimezone(helpers_dt.DEFAULT_TIME_ZONE)
+
+
+helpers_dt.set_default_time_zone = set_default_time_zone
+helpers_dt.get_time_zone = get_time_zone
+helpers_dt.parse_datetime = parse_datetime
+helpers_dt.as_local = as_local
+sys.modules["homeassistant.util.dt"] = helpers_dt
 
 helpers_event = types.ModuleType("homeassistant.helpers.event")
 helpers_event.async_call_later = lambda hass, delay, func: None
@@ -136,3 +171,18 @@ def test_log_handler_persists_last_ts():
         )
     )
     assert [e[1]["message"] for e in hass2.bus.events] == ["new"]
+
+
+def test_parse_timestamp_honors_timezone():
+    """Timestamp parsing should convert to Home Assistant's timezone."""
+
+    Store._data.clear()
+    hass = DummyHass()
+    handler = binary_sensor.MyloLogHandler(hass, [], "abc")
+
+    dt_util = binary_sensor.dt_util
+
+    dt_util.set_default_time_zone(dt_util.get_time_zone("Asia/Tokyo"))
+    dt = handler._parse_timestamp("2024-01-01T00:00:00")
+    assert dt.isoformat().endswith("+09:00")
+    dt_util.set_default_time_zone(dt_util.UTC)
