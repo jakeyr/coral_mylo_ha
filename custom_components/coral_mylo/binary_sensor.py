@@ -1,5 +1,6 @@
 """Binary sensors for MYLO."""
 
+from datetime import datetime
 import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.event import async_call_later
@@ -135,7 +136,16 @@ class MyloLogHandler:
     def __init__(self, hass, sensors: list[MyloLogBinarySensor]):
         self._hass = hass
         self._sensors = sensors
-        self._last_ts = ""
+        self._last_ts: datetime | None = None
+
+    @staticmethod
+    def _parse_timestamp(ts: str) -> datetime | None:
+        """Return a datetime for the timestamp string or ``None``."""
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except ValueError:
+            _LOGGER.warning("Invalid timestamp format: %s", ts)
+            return None
 
     async def handle_log(self, value):
         """Process incoming log updates from websocket."""
@@ -149,13 +159,16 @@ class MyloLogHandler:
                 entries = [value]
         else:
             return
-        entries.sort(key=lambda e: e.get("timestamp", ""))
+        entries.sort(
+            key=lambda e: self._parse_timestamp(e.get("timestamp", "")) or datetime.min
+        )
         for entry in entries:
             ts = entry.get("timestamp")
-            if ts and ts <= self._last_ts:
+            dt = self._parse_timestamp(ts) if ts else None
+            if dt and self._last_ts and dt <= self._last_ts:
                 continue
-            if ts:
-                self._last_ts = ts
+            if dt:
+                self._last_ts = dt
             self._hass.bus.async_fire(
                 "coral_mylo_log",
                 {

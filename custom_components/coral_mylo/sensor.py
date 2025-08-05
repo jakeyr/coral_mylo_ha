@@ -1,5 +1,6 @@
 """Sensor entities for MYLO."""
 
+from datetime import datetime
 import logging
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
@@ -193,7 +194,17 @@ class MyloRealtimeSensor(SensorEntity):
                 self._state = next(iter(value.values()), None)
         else:
             self._state = value
-        if self.hass:
+
+        if isinstance(self._state, str) and self.device_class == SensorDeviceClass.DATE:
+            try:
+                self._state = datetime.fromisoformat(self._state).date()
+            except ValueError:
+                _LOGGER.warning(
+                    "Invalid date format for %s: %s", self._path, self._state
+                )
+                self._state = None
+
+        if getattr(self, "hass", None):
             self.async_write_ha_state()
 
     @property
