@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import sys
 import types
+import asyncio
+from datetime import date
 
 
 # Stub out Home Assistant modules required for importing the integration
@@ -140,3 +142,21 @@ def test_device_classes_assigned():
         const_module.SensorDeviceClass.DATE,
     )
     assert last_off.device_class == const_module.SensorDeviceClass.DATE
+
+
+def test_last_off_notification_parses_date():
+    """Verify websocket provides a date object for date sensors."""
+
+    last_off = sensor.MyloRealtimeSensor(
+        "dev1",
+        "Last Off Notification",
+        "/monitoring/last_off_notification",
+        None,
+        None,
+        const_module.SensorDeviceClass.DATE,
+    )
+
+    asyncio.run(last_off.update_from_ws("2025-07-29T14:47:25.817893"))
+
+    assert isinstance(last_off.native_value, date)
+    assert last_off.native_value == date(2025, 7, 29)
