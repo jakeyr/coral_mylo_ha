@@ -1,9 +1,10 @@
 """Binary sensors for MYLO."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.storage import Store
 from .utils import discover_device_id_from_statsd
 from .const import CONF_IP_ADDRESS, DOMAIN
 
@@ -42,7 +43,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
         )
         entities.extend([person, near])
 
-        handler = MyloLogHandler(hass, [person, near])
+        handler = MyloLogHandler(hass, [person, near], device_id)
+        await handler.async_load()
         log_path = f"/pooldevices/{device_id}/log"
         ws.register_sensor(log_path, handler.handle_log)
         _LOGGER.debug("Registered log watcher for %s", log_path)
@@ -133,22 +135,43 @@ class MyloLogBinarySensor(BinarySensorEntity):
 class MyloLogHandler:
     """Handle realtime log updates and dispatch events."""
 
-    def __init__(self, hass, sensors: list[MyloLogBinarySensor]):
+    def __init__(self, hass, sensors: list[MyloLogBinarySensor], device_id: str):
         self._hass = hass
         self._sensors = sensors
+        self._device_id = device_id
+        self._store = Store(hass, 1, f"{DOMAIN}_{device_id}_log")
         self._last_ts: datetime | None = None
+
+    async def async_load(self):
+        """Load the last processed timestamp from storage."""
+        data = await self._store.async_load()
+        if data and (ts := data.get("last_ts")):
+            try:
+                self._last_ts = datetime.fromisoformat(ts)
+            except ValueError:
+                _LOGGER.debug("Stored timestamp %s is invalid", ts)
+
+    async def _save_last_ts(self):
+        if self._last_ts:
+            await self._store.async_save({"last_ts": self._last_ts.isoformat()})
 
     @staticmethod
     def _parse_timestamp(ts: str) -> datetime | None:
-        """Return a datetime for the timestamp string or ``None``."""
+        """Return a timezone-aware UTC datetime for the timestamp string."""
         try:
-            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            return dt
         except ValueError:
             _LOGGER.warning("Invalid timestamp format: %s", ts)
             return None
 
     async def handle_log(self, value):
         """Process incoming log updates from websocket."""
+        _LOGGER.debug("Handling log payload: %s", value)
         if isinstance(value, list):
             entries = value
         elif isinstance(value, dict):
@@ -166,9 +189,17 @@ class MyloLogHandler:
             ts = entry.get("timestamp")
             dt = self._parse_timestamp(ts) if ts else None
             if dt and self._last_ts and dt <= self._last_ts:
+                _LOGGER.debug(
+                    "Skipping old log entry %s with ts %s <= %s",
+                    entry,
+                    dt,
+                    self._last_ts,
+                )
                 continue
             if dt:
                 self._last_ts = dt
+                await self._save_last_ts()
+                _LOGGER.debug("Updated last timestamp to %s", self._last_ts)
             self._hass.bus.async_fire(
                 "coral_mylo_log",
                 {
@@ -180,5 +211,6 @@ class MyloLogHandler:
                     "privacy_mode": entry.get("privacy_mode"),
                 },
             )
+            _LOGGER.debug("Processed log entry: %s", entry)
             for sensor in self._sensors:
                 sensor.process_entry(entry)
