@@ -55,8 +55,14 @@ sys.modules["homeassistant.components.sensor"] = sensor_module
 
 const_module = types.ModuleType("homeassistant.const")
 const_module.UnitOfTemperature = types.SimpleNamespace(CELSIUS="°C")
-const_module.UnitOfLength = types.SimpleNamespace(CENTIMETERS="cm")
+const_module.UnitOfLength = types.SimpleNamespace(
+    CENTIMETERS="cm",
+    KILOMETERS="km",
+    MILLIMETERS="mm",
+)
 const_module.UnitOfSpeed = types.SimpleNamespace(KILOMETERS_PER_HOUR="km/h")
+const_module.UnitOfPressure = types.SimpleNamespace(MBAR="mbar")
+const_module.UnitOfTime = types.SimpleNamespace(SECONDS="s")
 const_module.CONCENTRATION_MICROGRAMS_PER_CUBIC_METER = "µg/m³"
 const_module.PERCENTAGE = "%"
 const_module.SensorDeviceClass = types.SimpleNamespace(
@@ -64,6 +70,10 @@ const_module.SensorDeviceClass = types.SimpleNamespace(
     DISTANCE="distance",
     WIND_SPEED="wind_speed",
     PM25="pm25",
+    PM10="pm10",
+    PRESSURE="pressure",
+    PRECIPITATION="precipitation",
+    DURATION="duration",
     BATTERY="battery",
     DATE="date",
 )
@@ -121,6 +131,49 @@ def test_device_classes_assigned():
     )
     assert wind.device_class == const_module.SensorDeviceClass.WIND_SPEED
     assert wind.native_unit_of_measurement == "km/h"
+
+    pressure = sensor.MyloSensor(
+        "1.2.3.4",
+        "dev1",
+        "weather.pressure_mb",
+        "Atmospheric Pressure",
+        const_module.UnitOfPressure.MBAR,
+        const_module.SensorDeviceClass.PRESSURE,
+    )
+    assert pressure.device_class == const_module.SensorDeviceClass.PRESSURE
+    assert pressure.native_unit_of_measurement == "mbar"
+
+    pm10 = sensor.MyloSensor(
+        "1.2.3.4",
+        "dev1",
+        "weather.aq_pm10",
+        "Air Quality PM10",
+        const_module.CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+        const_module.SensorDeviceClass.PM10,
+    )
+    assert pm10.device_class == const_module.SensorDeviceClass.PM10
+
+    precip = sensor.MyloSensor(
+        "1.2.3.4",
+        "dev1",
+        "weather.precip_mm.count",
+        "Precipitation",
+        const_module.UnitOfLength.MILLIMETERS,
+        const_module.SensorDeviceClass.PRECIPITATION,
+    )
+    assert precip.device_class == const_module.SensorDeviceClass.PRECIPITATION
+    assert precip.native_unit_of_measurement == "mm"
+
+    lag = sensor.MyloSensor(
+        "1.2.3.4",
+        "dev1",
+        "statsd.timestamp_lag",
+        "StatsD Timestamp Lag",
+        const_module.UnitOfTime.SECONDS,
+        const_module.SensorDeviceClass.DURATION,
+    )
+    assert lag.device_class == const_module.SensorDeviceClass.DURATION
+    assert lag.native_unit_of_measurement == "s"
 
     cpu = sensor.MyloRealtimeSensor(
         "dev1",
