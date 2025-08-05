@@ -202,7 +202,11 @@ class MyloSensor(SensorEntity):
 
     async def async_update(self):
         """Fetch latest value from the MYLO StatsD server."""
-        full_key = f"coral.{self._device_id}.{self._metric}"
+        full_key = (
+            self._metric
+            if self._metric.startswith("statsd.")
+            else f"coral.{self._device_id}.{self._metric}"
+        )
         _LOGGER.debug("Querying gauge %s on %s", full_key, self._ip)
         gauges = await self.hass.async_add_executor_job(
             read_gauges_from_statsd, self._ip

@@ -231,3 +231,30 @@ def test_memory_usage_parses_components():
         "available_mb": 873,
         "swap_percent": 41.0,
     }
+
+
+def test_statsd_metric_without_device_prefix(monkeypatch):
+    """StatsD metrics should be queried without a device prefix."""
+
+    lag = sensor.MyloSensor(
+        "1.2.3.4",
+        "dev1",
+        "statsd.timestamp_lag",
+        "StatsD Timestamp Lag",
+        const_module.UnitOfTime.SECONDS,
+        const_module.SensorDeviceClass.DURATION,
+    )
+
+    class FakeHass:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    lag.hass = FakeHass()
+
+    monkeypatch.setattr(
+        sensor, "read_gauges_from_statsd", lambda ip: {"statsd.timestamp_lag": 12}
+    )
+
+    asyncio.run(lag.async_update())
+
+    assert lag.native_value == 12
