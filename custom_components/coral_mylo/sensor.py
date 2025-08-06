@@ -368,6 +368,8 @@ class MyloPoolStateSensor(SensorEntity):
             default={},
         )
 
+        _LOGGER.debug("Most recent entry is %s", entry)
+
         code = entry.get("state")
         self._state = self._STATE_MAP.get(code)
         ts = entry.get("timestamp")
