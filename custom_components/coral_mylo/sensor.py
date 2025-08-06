@@ -1,6 +1,7 @@
 """Sensor entities for MYLO."""
 
 import logging
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.const import (
@@ -350,11 +351,22 @@ class MyloPoolStateSensor(SensorEntity):
         """Update the sensor from websocket messages."""
         _LOGGER.debug("Pool state sensor received %s", value)
         if isinstance(value, list):
-            entry = value[-1] if value else {}
+            entries = value
         elif isinstance(value, dict):
-            entry = value
+            if "state" in value:
+                entries = [value]
+            else:
+                entries = list(value.values())
         else:
-            entry = {"state": value}
+            entries = [{"state": value}]
+
+        entry = max(
+            entries,
+            key=lambda x: datetime.fromisoformat(
+                x.get("timestamp", "1970-01-01").replace("Z", "+00:00")
+            ),
+            default={},
+        )
 
         code = entry.get("state")
         self._state = self._STATE_MAP.get(code)
