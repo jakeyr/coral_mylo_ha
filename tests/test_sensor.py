@@ -335,3 +335,30 @@ def test_statsd_metric_without_device_prefix(monkeypatch):
     asyncio.run(lag.async_update())
 
     assert lag.native_value == 12
+
+
+def test_pool_state_sensor_maps_codes():
+    """Pool state codes are translated to human-readable states."""
+
+    ps = sensor.MyloPoolStateSensor("dev1", None)
+    asyncio.run(ps.update_from_ws({"state": 1, "timestamp": "2024-01-01"}))
+    assert ps.native_value == "empty"
+    asyncio.run(ps.update_from_ws({"state": 2}))
+    assert ps.native_value == "near_pool"
+    asyncio.run(ps.update_from_ws({"state": 3}))
+    assert ps.native_value == "in_pool"
+
+
+def test_pool_state_sensor_handles_list():
+    """When receiving a list, the latest entry is used."""
+
+    ps = sensor.MyloPoolStateSensor("dev1", None)
+    asyncio.run(
+        ps.update_from_ws(
+            [
+                {"state": 1},
+                {"state": 3, "timestamp": "2024-01-02"},
+            ]
+        )
+    )
+    assert ps.native_value == "in_pool"
