@@ -1,22 +1,39 @@
 # Coral Mylo Home Assistant Integration
 
-Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides several live sensors from the device's StatsD interface.
+Integrate your **Coral MYLO Pool Camera** with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides live sensors sourced from a mix of the device's StatsD service and Firebase WebSocket updates.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jakeyr&repository=coral_mylo_ha&category=integration)
 
 ## Features
 - **Camera** entity displaying the most recent MYLO image
 - **Button** to capture a fresh snapshot via Firebase
-- **Sensors** for key pool and weather values collected by MYLO:
+- **Sensors** for pool, weather, and system statistics collected from StatsD and real-time WebSocket updates:
   - Water temperature (`°C`)
   - Water level (`cm`)
+  - Water pressure (`mbar`)
+  - Water cloudiness (`%`)
   - Wind speed (`km/h`)
   - Air quality PM2.5 (`µg/m³`)
-  - Cloudiness status
-  - Health status
+  - Air quality PM10 (`µg/m³`)
+  - Precipitation (`mm`)
+  - Visibility (`km`)
+  - Atmospheric pressure (`mbar`)
+  - Darkness (`%`)
+  - Alert level
+  - Pool used count
+  - Robot count
+  - StatsD timestamp lag (`s`)
+  - Cloudiness (`%`)
   - Pool status
   - Battery level
   - System ping
+  - CPU temperature (`°C`)
+  - GPU temperature (`°C`)
+  - Memory usage (`%` used with attributes)
+  - Update status
+  - Last off notification (date)
+- **Binary sensors** for device health and log-triggered presence alerts in and around the pool (auto-reset after a short period)
+- **Events**: each device log entry is emitted on the Home Assistant bus as `coral_mylo_log`
 
 ## Requirements
 - A running Home Assistant instance (Core or OS)
@@ -92,13 +109,31 @@ The integration automatically creates `number.mylo_refresh_interval` with a defa
 - `button.mylo_refresh_image` – capture a new snapshot on demand.
 - `sensor.mylo_water_temperature` – pool water temperature.
 - `sensor.mylo_water_level` – measured distance from camera to water surface.
+- `sensor.mylo_water_pressure` – water pressure.
+- `sensor.mylo_water_cloudiness` – water cloudiness percentage.
 - `sensor.mylo_wind_speed` – outdoor wind speed near the pool.
 - `sensor.mylo_air_quality_pm2_5` – particulate matter reading (PM2.5).
-- `sensor.mylo_cloudiness` – pool water cloudiness.
-- `sensor.mylo_health` – overall device health.
+- `sensor.mylo_air_quality_pm10` – particulate matter reading (PM10).
+- `sensor.mylo_precipitation` – recent precipitation.
+- `sensor.mylo_visibility` – visibility distance.
+- `sensor.mylo_atmospheric_pressure` – atmospheric pressure.
+- `sensor.mylo_darkness` – ambient darkness level.
+- `sensor.mylo_alert_level` – current alert level.
+- `sensor.mylo_pool_used_count` – number of times the pool was used.
+- `sensor.mylo_robot_count` – number of robot activations.
+- `sensor.mylo_statsd_timestamp_lag` – lag between MYLO and StatsD timestamps.
+- `sensor.mylo_cloudiness` – cloudiness percentage.
 - `sensor.mylo_pool_status` – current pool status.
 - `sensor.mylo_battery` – MYLO battery level.
 - `sensor.mylo_system_ping` – last system ping timestamp.
+- `sensor.mylo_cpu_temperature` – CPU temperature.
+- `sensor.mylo_gpu_temperature` – GPU temperature.
+- `sensor.mylo_memory_usage` – percent of memory used with extra attributes.
+- `sensor.mylo_update_status` – current update status.
+- `sensor.mylo_last_off_notification` – date the device last reported being off.
+- `binary_sensor.mylo_health` – overall device health.
+- `binary_sensor.mylo_person_detected_in_pool` – switches on for about two minutes when the device log reports a person in the pool.
+- `binary_sensor.mylo_someone_detected_near_pool` – switches on for about two minutes when the device log reports someone near the pool.
 - `number.mylo_refresh_interval` – how often to automatically refresh snapshots (defaults to 300 seconds).
 
 The device ID becomes part of each entity's unique ID, ensuring separate MYLO units are differentiated if you add more than one.
