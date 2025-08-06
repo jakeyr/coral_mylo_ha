@@ -1,13 +1,13 @@
 # Coral Mylo Home Assistant Integration
 
-Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides several live sensors from the device's StatsD interface.
+Integrate your **Coral MYLO Pool Camera** with Home Assistant. The integration exposes the latest pool snapshot as a camera entity and provides live sensors sourced from a mix of the device's StatsD service and Firebase WebSocket updates.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jakeyr&repository=coral_mylo_ha&category=integration)
 
 ## Features
 - **Camera** entity displaying the most recent MYLO image
 - **Button** to capture a fresh snapshot via Firebase
-- **Sensors** for pool, weather, and system statistics collected by MYLO:
+- **Sensors** for pool, weather, and system statistics collected from StatsD and real-time WebSocket updates:
   - Water temperature (`°C`)
   - Water level (`cm`)
   - Water pressure (`mbar`)
@@ -23,7 +23,7 @@ Integrate your **Coral MYLO Pool Camera** (also known as SmartPool MYLO) with Ho
   - Pool used count
   - Robot count
   - StatsD timestamp lag (`s`)
-  - Cloudiness status
+  - Cloudiness (`%`)
   - Pool status
   - Battery level
   - System ping
@@ -122,7 +122,7 @@ The integration automatically creates `number.mylo_refresh_interval` with a defa
 - `sensor.mylo_pool_used_count` – number of times the pool was used.
 - `sensor.mylo_robot_count` – number of robot activations.
 - `sensor.mylo_statsd_timestamp_lag` – lag between MYLO and StatsD timestamps.
-- `sensor.mylo_cloudiness` – status cloudiness reading.
+- `sensor.mylo_cloudiness` – cloudiness percentage.
 - `sensor.mylo_pool_status` – current pool status.
 - `sensor.mylo_battery` – MYLO battery level.
 - `sensor.mylo_system_ping` – last system ping timestamp.
