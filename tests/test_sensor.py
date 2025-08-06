@@ -362,3 +362,18 @@ def test_pool_state_sensor_handles_list():
         )
     )
     assert ps.native_value == "in_pool"
+
+
+def test_pool_state_sensor_handles_dict_of_entries():
+    """When receiving a dict of entries, the newest timestamp is used."""
+
+    ps = sensor.MyloPoolStateSensor("dev1", None)
+    asyncio.run(
+        ps.update_from_ws(
+            {
+                "0": {"state": 1, "timestamp": "2024-01-01"},
+                "1": {"state": 3, "timestamp": "2024-01-02"},
+            }
+        )
+    )
+    assert ps.native_value == "in_pool"
