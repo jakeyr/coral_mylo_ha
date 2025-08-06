@@ -32,7 +32,7 @@ Integrate your **Coral MYLO Pool Camera** with Home Assistant. The integration e
   - Memory usage (`%` used with attributes)
   - Update status
   - Last off notification (date)
-- **Binary sensors** for device health and log events (person detected in pool or near the pool)
+- **Binary sensors** for device health and log-triggered presence alerts in and around the pool (auto-reset after a short period)
 - **Events**: each device log entry is emitted on the Home Assistant bus as `coral_mylo_log`
 
 ## Requirements
@@ -132,8 +132,8 @@ The integration automatically creates `number.mylo_refresh_interval` with a defa
 - `sensor.mylo_update_status` – current update status.
 - `sensor.mylo_last_off_notification` – date the device last reported being off.
 - `binary_sensor.mylo_health` – overall device health.
-- `binary_sensor.mylo_person_detected_in_pool` – turns on briefly when a person is detected in the pool.
-- `binary_sensor.mylo_someone_detected_near_pool` – turns on briefly when someone is detected near the pool.
+- `binary_sensor.mylo_person_detected_in_pool` – switches on for about two minutes when the device log reports a person in the pool.
+- `binary_sensor.mylo_someone_detected_near_pool` – switches on for about two minutes when the device log reports someone near the pool.
 - `number.mylo_refresh_interval` – how often to automatically refresh snapshots (defaults to 300 seconds).
 
 The device ID becomes part of each entity's unique ID, ensuring separate MYLO units are differentiated if you add more than one.
