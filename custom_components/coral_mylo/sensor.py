@@ -30,14 +30,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up MYLO sensors for a config entry."""
     _LOGGER.debug("Setting up sensors for entry %s", entry.entry_id)
     ip = entry.data[CONF_IP_ADDRESS]
+
     # Retrieve cached device id when available
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(
-            discover_device_id_from_statsd, ip
-        )
-        if not device_id:
-            _LOGGER.error("Could not discover device ID for sensors")
+        try:
+            device_id = await hass.async_add_executor_job(
+                discover_device_id_from_statsd, ip
+            )
+            if not device_id:
+                _LOGGER.error("Could not discover device ID for sensors")
+                return
+            # Cache the discovered device ID
+            hass.data.setdefault(DOMAIN, {}).setdefault("device_ids", {})[
+                entry.entry_id
+            ] = device_id
+        except Exception as e:
+            _LOGGER.error("Error discovering device ID: %s", e)
             return
 
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
@@ -219,20 +228,26 @@ class MyloSensor(SensorEntity):
             else f"coral.{self._device_id}.{self._metric}"
         )
         _LOGGER.debug("Querying gauge %s on %s", full_key, self._ip)
-        gauges = await self.hass.async_add_executor_job(
-            read_gauges_from_statsd, self._ip
-        )
-        value = gauges.get(full_key)
-        if isinstance(value, str):
-            dt = dt_util.parse_datetime(value.replace("Z", "+00:00"))
-            if dt is not None:
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=dt_util.UTC)
-                value = dt_util.as_local(dt)
-        if value is not None:
-            self._state = value
-        else:
-            _LOGGER.warning("No data found for metric %s", full_key)
+        try:
+            gauges = await self.hass.async_add_executor_job(
+                read_gauges_from_statsd, self._ip
+            )
+            value = gauges.get(full_key)
+            if isinstance(value, str):
+                dt = dt_util.parse_datetime(value.replace("Z", "+00:00"))
+                if dt is not None:
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=dt_util.UTC)
+                    value = dt_util.as_local(dt)
+            if value is not None:
+                self._state = value
+            else:
+                _LOGGER.warning("No data found for metric %s", full_key)
+        except Exception as e:
+            _LOGGER.error(
+                "Error updating sensor %s: %s", getattr(self, "_name", self._metric), e
+            )
+            # Preserve last known good value on error
 
     @property
     def native_value(self):

@@ -5,6 +5,7 @@ import socket
 import asyncio
 import time
 import json
+import ast
 import aiohttp
 import re
 
@@ -37,7 +38,7 @@ def read_gauges_from_statsd(ip):
                 if b"END" in chunk:
                     break
             text = response.decode("utf-8").strip().split("\nEND")[0]
-            return eval(text.strip())
+            return ast.literal_eval(text.strip())
     except Exception as e:
         _LOGGER.error(f"Error retrieving gauges: {e}")
         return {}
@@ -249,35 +250,55 @@ class MyloWebsocketClient:
             except Exception as e:
                 _LOGGER.error("WebSocket connection error: %s", e)
                 _LOGGER.debug("Retrying websocket connection in 5s")
-            self._connected.clear()
-            if self._ws:
-                await self._ws.close()
+            finally:
+                self._connected.clear()
+                if self._ws:
+                    try:
+                        await self._ws.close()
+                    except Exception as e:
+                        _LOGGER.debug("Error closing websocket: %s", e)
+                    self._ws = None
             await asyncio.sleep(5)
 
     async def send_getimage(self, mobile_id="ha", timeout=30):
         """Trigger MYLO to capture a new image and wait for readiness."""
-        await self._connected.wait()
+        if not self._running:
+            _LOGGER.error("WebSocket client is not running")
+            return False
+
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=10)
+        except asyncio.TimeoutError:
+            _LOGGER.error("WebSocket not connected within timeout")
+            return False
+
         self._img_event.clear()
         self._rid += 1
-        await self._send(
-            {
-                "t": "d",
-                "d": {
-                    "r": self._rid,
-                    "a": "m",
-                    "b": {
-                        "p": f"/pooldevices/{self._device_id}/getimage",
-                        "d": {
-                            "device": mobile_id,
-                            "time": str(int(time.time() * 1000)),
+        try:
+            await self._send(
+                {
+                    "t": "d",
+                    "d": {
+                        "r": self._rid,
+                        "a": "m",
+                        "b": {
+                            "p": f"/pooldevices/{self._device_id}/getimage",
+                            "d": {
+                                "device": mobile_id,
+                                "time": str(int(time.time() * 1000)),
+                            },
                         },
                     },
-                },
-            }
-        )
+                }
+            )
+        except Exception as e:
+            _LOGGER.error("Error sending getimage request: %s", e)
+            return False
+
         try:
             await asyncio.wait_for(self._img_event.wait(), timeout=timeout)
             _LOGGER.debug("Image ready event received")
             return True
         except asyncio.TimeoutError:
+            _LOGGER.error("Timeout waiting for image ready event")
             return False
