@@ -1,11 +1,25 @@
 """Sensor entities for MYLO."""
 
 import logging
-from homeassistant.helpers.entity import Entity
+from datetime import datetime
+
+from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.const import (
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    PERCENTAGE,
+    UnitOfLength,
+    UnitOfPressure,
+    UnitOfSpeed,
+    UnitOfTemperature,
+    UnitOfTime,
+)
+
+from homeassistant.util import dt as dt_util
 from .utils import (
     discover_device_id_from_statsd,
     read_gauges_from_statsd,
     MyloWebsocketClient,
+    parse_memory_usage,
 )
 from .const import CONF_IP_ADDRESS, DOMAIN
 
@@ -38,41 +52,160 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)
 
     metrics = [
-        ("water.temperature", "Water Temperature", "°C"),
-        ("water.level", "Water Level", "cm"),
-        ("weather.wind_kph", "Wind Speed", "km/h"),
-        ("weather.aq_pm2_5", "Air Quality PM2.5", "µg/m³"),
+        (
+            "water.temperature",
+            "Water Temperature",
+            UnitOfTemperature.CELSIUS,
+            SensorDeviceClass.TEMPERATURE,
+        ),
+        (
+            "water.level",
+            "Water Level",
+            UnitOfLength.CENTIMETERS,
+            SensorDeviceClass.DISTANCE,
+        ),
+        (
+            "water.pressure_sensor",
+            "Water Pressure",
+            UnitOfPressure.MBAR,
+            SensorDeviceClass.PRESSURE,
+        ),
+        (
+            "water.cloudiness",
+            "Water Cloudiness",
+            PERCENTAGE,
+            None,
+        ),
+        (
+            "weather.wind_kph",
+            "Wind Speed",
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+            SensorDeviceClass.WIND_SPEED,
+        ),
+        (
+            "weather.aq_pm2_5",
+            "Air Quality PM2.5",
+            CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+            SensorDeviceClass.PM25,
+        ),
+        (
+            "weather.aq_pm10",
+            "Air Quality PM10",
+            CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+            SensorDeviceClass.PM10,
+        ),
+        (
+            "weather.precip_mm.count",
+            "Precipitation",
+            UnitOfLength.MILLIMETERS,
+            SensorDeviceClass.PRECIPITATION,
+        ),
+        (
+            "weather.vis_km",
+            "Visibility",
+            UnitOfLength.KILOMETERS,
+            SensorDeviceClass.DISTANCE,
+        ),
+        (
+            "weather.pressure_mb",
+            "Atmospheric Pressure",
+            UnitOfPressure.MBAR,
+            SensorDeviceClass.PRESSURE,
+        ),
+        (
+            "darkness",
+            "Darkness",
+            PERCENTAGE,
+            None,
+        ),
+        (
+            "manager.alert_level",
+            "Alert Level",
+            None,
+            None,
+        ),
+        (
+            "pool.used.count",
+            "Pool Used Count",
+            None,
+            None,
+        ),
+        (
+            "robot.count",
+            "Robot Count",
+            None,
+            None,
+        ),
+        (
+            "statsd.timestamp_lag",
+            "StatsD Timestamp Lag",
+            UnitOfTime.SECONDS,
+            SensorDeviceClass.DURATION,
+        ),
     ]
 
-    sensors = [MyloSensor(ip, device_id, m, n, u) for m, n, u in metrics]
+    sensors = [MyloSensor(ip, device_id, m, n, u, dc) for m, n, u, dc in metrics]
     realtime = []
     if ws:
         realtime_specs = [
-            ("cloudiness", "Cloudiness"),
-            ("health", "Health"),
-            ("pool_status", "Pool Status"),
-            ("battery", "Battery"),
-            ("system_ping", "System Ping"),
+            ("status/cloudiness", "Cloudiness", PERCENTAGE, None),
+            ("status/pool_status", "Pool Status", None, None),
+            (
+                "status/battery",
+                "Battery",
+                PERCENTAGE,
+                SensorDeviceClass.BATTERY,
+            ),
+            (
+                "status/system_ping",
+                "System Ping",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+            ),
+            (
+                "status/temperature/cpu",
+                "CPU Temperature",
+                UnitOfTemperature.CELSIUS,
+                SensorDeviceClass.TEMPERATURE,
+            ),
+            (
+                "status/temperature/gpu",
+                "GPU Temperature",
+                UnitOfTemperature.CELSIUS,
+                SensorDeviceClass.TEMPERATURE,
+            ),
+            ("status/memory", "Memory Usage", None, None),
+            ("status/balena_update/status", "Update Status", None, None),
+            (
+                "monitoring/last_off_notification",
+                "Last Off Notification",
+                None,
+                SensorDeviceClass.DATE,
+            ),
         ]
-        for key, name in realtime_specs:
-            path = f"/pooldevices/{device_id}/status/{key}"
-            ent = MyloRealtimeSensor(device_id, name, path, ws)
+        for path, name, unit, device_class in realtime_specs:
+            full_path = f"/pooldevices/{device_id}/{path}"
+            ent = MyloRealtimeSensor(device_id, name, full_path, ws, unit, device_class)
             realtime.append(ent)
-            ws.register_sensor(path, ent.update_from_ws)
-            _LOGGER.debug("Registered realtime sensor for %s", path)
+            ws.register_sensor(full_path, ent.update_from_ws)
+            _LOGGER.debug("Registered realtime sensor for %s", full_path)
+
+        state_sensor = MyloPoolStateSensor(device_id, ws)
+        realtime.append(state_sensor)
+        ws.register_sensor(state_sensor.path, state_sensor.update_from_ws)
+        _LOGGER.debug("Registered realtime sensor for %s", state_sensor.path)
 
     async_add_entities(sensors + realtime, update_before_add=True)
 
 
-class MyloSensor(Entity):
+class MyloSensor(SensorEntity):
     """Sensor that polls values from the MYLO StatsD service."""
 
-    def __init__(self, ip, device_id, metric, name, unit):
+    def __init__(self, ip, device_id, metric, name, unit, device_class=None):
+        """Initialize the MYLO sensor."""
         self._ip = ip
         self._device_id = device_id
         self._metric = metric
-        self._name = name
-        self._unit = unit
         self._state = None
         self._attr_name = f"Mylo {name}"
         self._attr_unique_id = f"mylo_{device_id}_{metric.replace('.', '_')}"
@@ -83,37 +216,57 @@ class MyloSensor(Entity):
             "model": "MYLO",
             "name": f"MYLO {device_id}",
         }
+        self._attr_native_unit_of_measurement = unit
+        if device_class:
+            self._attr_device_class = device_class
 
     async def async_update(self):
         """Fetch latest value from the MYLO StatsD server."""
-        full_key = f"coral.{self._device_id}.{self._metric}"
+        full_key = (
+            self._metric
+            if self._metric.startswith("statsd.")
+            else f"coral.{self._device_id}.{self._metric}"
+        )
         _LOGGER.debug("Querying gauge %s on %s", full_key, self._ip)
         try:
             gauges = await self.hass.async_add_executor_job(
                 read_gauges_from_statsd, self._ip
             )
             value = gauges.get(full_key)
+            if isinstance(value, str):
+                dt = dt_util.parse_datetime(value.replace("Z", "+00:00"))
+                if dt is not None:
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=dt_util.UTC)
+                    value = dt_util.as_local(dt)
             if value is not None:
                 self._state = value
             else:
-                _LOGGER.warning(f"No data found for metric {full_key}")
+                _LOGGER.warning("No data found for metric %s", full_key)
         except Exception as e:
-            _LOGGER.error(f"Error updating sensor {self._name}: {e}")
-            # Don't update state on error to preserve last known good value
+            _LOGGER.error(
+                "Error updating sensor %s: %s", getattr(self, "_name", self._metric), e
+            )
+            # Preserve last known good value on error
 
     @property
-    def state(self):
+    def native_value(self):
+        """Return the current value of the sensor."""
         return self._state
 
-    @property
-    def unit_of_measurement(self):
-        return self._unit
 
-
-class MyloRealtimeSensor(Entity):
+class MyloRealtimeSensor(SensorEntity):
     """Sensor updated from Firebase websocket."""
 
-    def __init__(self, device_id, name, path, ws: MyloWebsocketClient):
+    def __init__(
+        self,
+        device_id,
+        name,
+        path,
+        ws: MyloWebsocketClient,
+        unit=None,
+        device_class=None,
+    ):
         self._device_id = device_id
         self._name = name
         self._path = path
@@ -123,6 +276,10 @@ class MyloRealtimeSensor(Entity):
         uid = path.replace("/", "_").strip("_")
         self._attr_unique_id = f"mylo_{uid}"
         self._attr_should_poll = False
+        if unit:
+            self._attr_native_unit_of_measurement = unit
+        if device_class:
+            self._attr_device_class = device_class
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device_id)},
             "manufacturer": "Coral SmartPool",
@@ -133,7 +290,17 @@ class MyloRealtimeSensor(Entity):
     async def update_from_ws(self, value):
         """Update state from websocket push message."""
         _LOGGER.debug("Realtime sensor %s received %s", self._path, value)
-        if isinstance(value, dict):
+        if isinstance(value, str) and self._path.endswith("/status/memory"):
+            parsed = parse_memory_usage(value)
+            if parsed:
+                self._state = parsed["used_percent"]
+                self._attr_extra_state_attributes = {
+                    "available_mb": parsed["available_mb"],
+                    "swap_percent": parsed["swap_percent"],
+                }
+            else:
+                self._state = value
+        elif isinstance(value, dict):
             if "status" in value:
                 self._state = value["status"]
             elif "level" in value:
@@ -142,9 +309,90 @@ class MyloRealtimeSensor(Entity):
                 self._state = next(iter(value.values()), None)
         else:
             self._state = value
-        if self.hass:
+
+        if isinstance(self._state, str):
+            dt = dt_util.parse_datetime(self._state.replace("Z", "+00:00"))
+            if dt is not None:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=dt_util.UTC)
+                dt = dt_util.as_local(dt)
+                if self.device_class == SensorDeviceClass.DATE:
+                    self._state = dt.date()
+                else:
+                    self._state = dt
+            elif self.device_class in (
+                SensorDeviceClass.DATE,
+                SensorDeviceClass.TIMESTAMP,
+            ):
+                _LOGGER.warning(
+                    "Invalid date format for %s: %s", self._path, self._state
+                )
+                self._state = None
+
+        if getattr(self, "hass", None):
             self.async_write_ha_state()
 
     @property
-    def state(self):
+    def native_value(self):
+        """Return the current value of the sensor."""
+        return self._state
+
+
+class MyloPoolStateSensor(SensorEntity):
+    """Sensor representing the pool occupancy state."""
+
+    _STATE_MAP = {1: "empty", 2: "near_pool", 3: "in_pool"}
+
+    def __init__(self, device_id: str, ws: MyloWebsocketClient | None):
+        self._device_id = device_id
+        self._ws = ws
+        self._path = f"/pooldevices/{device_id}/state_log"
+        self._state: str | None = None
+        self._attr_name = "Mylo Pool State"
+        self._attr_unique_id = f"mylo_{device_id}_pool_state"
+        self._attr_should_poll = False
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device_id)},
+            "manufacturer": "Coral SmartPool",
+            "model": "MYLO",
+            "name": f"MYLO {device_id}",
+        }
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    async def update_from_ws(self, value):
+        """Update the sensor from websocket messages."""
+        _LOGGER.debug("Pool state sensor received %s", value)
+        if isinstance(value, list):
+            entries = value
+        elif isinstance(value, dict):
+            if "state" in value:
+                entries = [value]
+            else:
+                entries = list(value.values())
+        else:
+            entries = [{"state": value}]
+
+        entry = max(
+            entries,
+            key=lambda x: datetime.fromisoformat(
+                x.get("timestamp", "1970-01-01").replace("Z", "+00:00")
+            ),
+            default={},
+        )
+
+        _LOGGER.debug("Most recent entry is %s", entry)
+
+        code = entry.get("state")
+        self._state = self._STATE_MAP.get(code)
+        ts = entry.get("timestamp")
+        if ts:
+            self._attr_extra_state_attributes = {"timestamp": ts}
+        if getattr(self, "hass", None):
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self):
         return self._state

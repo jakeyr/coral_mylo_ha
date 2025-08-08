@@ -7,6 +7,7 @@ import time
 import json
 import ast
 import aiohttp
+import re
 
 _LOGGER = logging.getLogger(__name__)
 STATS_PORT = 8126
@@ -47,6 +48,37 @@ def get_statsd_gauge_value(ip, key):
     """Convenience helper to fetch a single StatsD gauge value."""
     gauges = read_gauges_from_statsd(ip)
     return gauges.get(key)
+
+
+def parse_memory_usage(value):
+    """Parse memory usage string into its components.
+
+    Expected format: "used: 78.0%, available: 873MB, swap is at 41%".
+
+    Returns a dictionary with keys:
+    - ``used_percent`` (float)
+    - ``available_mb`` (int)
+    - ``swap_percent`` (float)
+    or ``None`` if parsing fails.
+    """
+
+    if not isinstance(value, str):
+        return None
+
+    pattern = (
+        r"used:\s*(?P<used>\d+(?:\.\d+)?)%,\s*"
+        r"available:\s*(?P<available>\d+)MB,\s*"
+        r"swap is at\s*(?P<swap>\d+(?:\.\d+)?)%"
+    )
+    match = re.search(pattern, value)
+    if not match:
+        return None
+
+    return {
+        "used_percent": float(match.group("used")),
+        "available_mb": int(match.group("available")),
+        "swap_percent": float(match.group("swap")),
+    }
 
 
 async def refresh_jwt(refresh_token, api_key):

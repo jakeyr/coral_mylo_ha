@@ -47,7 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         device_id = None
 
     await hass.config_entries.async_forward_entry_setups(
-        entry, ["sensor", "camera", "button"]
+        entry, ["sensor", "camera", "button", "number", "binary_sensor"]
     )
     return True
 
@@ -56,7 +56,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     _LOGGER.debug("Unloading entry %s", entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, ["sensor", "camera", "button"]
+        entry, ["sensor", "camera", "button", "number", "binary_sensor"]
     )
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)

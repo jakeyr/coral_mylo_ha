@@ -3,3 +3,4 @@ DOMAIN = "coral_mylo"
 CONF_IP_ADDRESS = "ip"
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_API_KEY = "api_key"
+DEFAULT_REFRESH_INTERVAL = 300
