@@ -20,11 +20,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     device_id = hass.data.get(DOMAIN, {}).get("device_ids", {}).get(entry.entry_id)
     if not device_id:
-        device_id = await hass.async_add_executor_job(
-            discover_device_id_from_statsd, ip
-        )
-        if not device_id:
-            _LOGGER.error("Could not discover device ID from StatsD")
+        try:
+            device_id = await hass.async_add_executor_job(
+                discover_device_id_from_statsd, ip
+            )
+            if not device_id:
+                _LOGGER.error("Could not discover device ID from StatsD")
+                return
+            # Cache the discovered device ID
+            hass.data.setdefault(DOMAIN, {}).setdefault("device_ids", {})[
+                entry.entry_id
+            ] = device_id
+        except Exception as e:
+            _LOGGER.error("Error discovering device ID: %s", e)
             return
 
     ws = hass.data.get(DOMAIN, {}).get("ws", {}).get(entry.entry_id)

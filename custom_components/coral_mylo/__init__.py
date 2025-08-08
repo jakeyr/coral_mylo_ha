@@ -28,15 +28,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api_key = entry.data[CONF_API_KEY]
 
     # Discover the unique MYLO device id via the StatsD service
-    device_id = await hass.async_add_executor_job(discover_device_id_from_statsd, ip)
-    _LOGGER.debug("Discovered device id %s", device_id)
-    if device_id:
-        ws = MyloWebsocketClient(hass, device_id, refresh, api_key)
-        hass.data[DOMAIN].setdefault("ws", {})[entry.entry_id] = ws
-        hass.data[DOMAIN].setdefault("device_ids", {})[entry.entry_id] = device_id
-        _LOGGER.debug("Starting websocket for %s", device_id)
-        await ws.start()
-    else:
+    try:
+        device_id = await hass.async_add_executor_job(
+            discover_device_id_from_statsd, ip
+        )
+        _LOGGER.debug("Discovered device id %s", device_id)
+        if device_id:
+            ws = MyloWebsocketClient(hass, device_id, refresh, api_key)
+            hass.data[DOMAIN].setdefault("ws", {})[entry.entry_id] = ws
+            hass.data[DOMAIN].setdefault("device_ids", {})[entry.entry_id] = device_id
+            _LOGGER.debug("Starting websocket for %s", device_id)
+            await ws.start()
+        else:
+            _LOGGER.error("Could not discover device ID for entry %s", entry.entry_id)
+            device_id = None
+    except Exception as e:
+        _LOGGER.error("Error discovering device ID: %s", e)
         device_id = None
 
     await hass.config_entries.async_forward_entry_setups(
